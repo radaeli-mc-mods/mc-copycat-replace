@@ -2,7 +2,7 @@ package com.radaeli.copycatreplace.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-/** Global settings shared by all worlds in a mod instance. */
+/** Server-owned action settings; the loader supports per-world configuration. */
 public final class CopycatReplaceConfig {
     public static final int MAX_CONNECTED_BLOCKS_LIMIT = 256;
     public static final ModConfigSpec SPEC;

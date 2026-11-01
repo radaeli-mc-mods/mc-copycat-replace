@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Added a Forge 1.20.1 version for Create 6.0.8, with support for Copycats+ 3.0.4.
 
+### Changed
+
+- Moved the connected-action limit to `copycat_replace-server.toml`, automatically carrying over the previous COMMON value when creating the new configuration.
+
 ## [0.1.0] - 2026-09-29
 
 ### Added

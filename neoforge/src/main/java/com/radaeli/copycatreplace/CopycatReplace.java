@@ -2,6 +2,7 @@ package com.radaeli.copycatreplace;
 
 import com.mojang.logging.LogUtils;
 import com.radaeli.copycatreplace.config.CopycatReplaceConfig;
+import com.radaeli.copycatreplace.config.LegacyConfigMigration;
 import com.radaeli.copycatreplace.interaction.CopycatReplaceHandler;
 import com.radaeli.copycatreplace.network.ConnectedBlockLimitSync;
 import net.neoforged.fml.ModContainer;
@@ -19,7 +20,8 @@ public final class CopycatReplace {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public CopycatReplace(IEventBus modEventBus, ModContainer modContainer) {
-        modContainer.registerConfig(ModConfig.Type.COMMON, CopycatReplaceConfig.SPEC);
+        LegacyConfigMigration.prepare();
+        modContainer.registerConfig(ModConfig.Type.SERVER, CopycatReplaceConfig.SPEC);
         modEventBus.addListener(ConnectedBlockLimitSync::onConfigReloading);
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGH, CopycatReplaceHandler::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(ConnectedBlockLimitSync::onPlayerLoggedIn);

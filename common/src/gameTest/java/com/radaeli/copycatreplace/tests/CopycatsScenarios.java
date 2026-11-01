@@ -21,7 +21,8 @@ final class CopycatsScenarios {
         return List.of(test("copycats_single", CopycatsScenarios::single),
                 test("multipart_individual_tokens", CopycatsScenarios::individual),
                 test("multipart_bulk_tokens", CopycatsScenarios::bulk),
-                test("multipart_state_only", CopycatsScenarios::orientation));
+                test("multipart_state_only", CopycatsScenarios::orientation),
+                test("multipart_permission_veto", CopycatsScenarios::permission));
     }
     private static void single(GameTestHelper h) {
         BlockPos pos = place(h, ORIGIN, CCBlocks.COPYCAT_BLOCK.getDefaultState(), null);
@@ -70,6 +71,25 @@ final class CopycatsScenarios {
         target(h, a.pos).removeMatchingMaterial(Blocks.OAK_PLANKS, p, hit(a.pos));
         check(p.getInventory().countItem(Items.OAK_PLANKS) == beforeRemoval + 1, "Removal duplicated or lost a shared token");
         check(!a.be.getMaterialItemStorage().getMaterialMap().values().stream().anyMatch(s -> s.is(Blocks.OAK_PLANKS)), "Not all matching parts removed");
+    }
+    private static void permission(GameTestHelper h) {
+        Fixture a = fixture(h, ORIGIN, false), b = fixture(h, ORIGIN.east(), true);
+        ServerPlayer p = player(h, false);
+        equip(p, false, new ItemStack(Items.OAK_PLANKS, 4));
+        try (var protection = TestPlatform.protect(p, Set.of(b.pos), true, true)) {
+            int replaced = BulkMaterialReplacement.replaceConnected(h.getLevel(), a.pos,
+                    h.getLevel().getBlockState(a.pos), hit(a.pos), p, InteractionHand.OFF_HAND, p.getOffhandItem());
+            check(replaced == 1 && p.getOffhandItem().getCount() == 3, "Denied multipart position consumed material");
+            check(p.getInventory().countItem(Items.STONE) == 1, "Denied multipart position refunded a token");
+            int removed = BulkMaterialReplacement.removeConnected(h.getLevel(), b.pos,
+                    h.getLevel().getBlockState(b.pos), hit(b.pos), p);
+            check(removed == 0, "Denied multipart origin was removed");
+            var storage = b.be.getMaterialItemStorage();
+            check(storage.getMaterialMap().values().stream().anyMatch(s -> s.is(Blocks.STONE))
+                    && storage.getMaterialMap().values().stream().anyMatch(s -> s.is(Blocks.ANDESITE)), "Denied multipart materials changed");
+            check(storage.getAllConsumedItems().stream().filter(s -> !s.isEmpty()).count() == 2,
+                    "Denied multipart position lost its paid tokens");
+        }
     }
     private static void orientation(GameTestHelper h) {
         Fixture f = fixture(h, ORIGIN, false);

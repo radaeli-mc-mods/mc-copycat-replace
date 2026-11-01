@@ -44,7 +44,9 @@ public final class BulkMaterialReplacement {
                 entry -> !entry.target().hasCustomMaterial(
                         translateHit(origin, entry.pos(), originHit)
                 ),
-                CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get()
+                CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get(),
+                pos -> MaterialEditPermission.mayEdit(level, pos, player,
+                        translateHit(origin, pos, originHit), MaterialEditPermission.Operation.APPLY)
         );
         int changed = 0;
         BlockState soundMaterial = null;
@@ -88,7 +90,9 @@ public final class BulkMaterialReplacement {
         List<PositionTarget> cluster = findCluster(
                 level, origin, originHit, originTarget,
                 entry -> entry.target().containsMaterial(sourceMaterial),
-                CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get()
+                CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get(),
+                pos -> MaterialEditPermission.mayEdit(level, pos, player,
+                        translateHit(origin, pos, originHit), MaterialEditPermission.Operation.REPLACE)
         );
         int changed = 0;
         BlockState soundMaterial = null;
@@ -133,7 +137,9 @@ public final class BulkMaterialReplacement {
         List<PositionTarget> cluster = findCluster(
                 level, origin, originHit, originTarget,
                 entry -> entry.target().containsMaterial(sourceMaterial),
-                CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get()
+                CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get(),
+                pos -> MaterialEditPermission.mayEdit(level, pos, player,
+                        translateHit(origin, pos, originHit), MaterialEditPermission.Operation.REMOVE)
         );
         int changed = 0;
         BlockState removedMaterial = null;
@@ -190,7 +196,7 @@ public final class BulkMaterialReplacement {
                 ? entry -> !entry.target().hasCustomMaterial(translateHit(origin, entry.pos(), originHit))
                 : entry -> entry.target().containsMaterial(sourceMaterial);
         List<PositionTarget> cluster = findCluster(
-                level, origin, originHit, originTarget, isEligible, previewMaximum
+                level, origin, originHit, originTarget, isEligible, previewMaximum, pos -> true
         );
 
         int count = cluster.size();
@@ -215,7 +221,8 @@ public final class BulkMaterialReplacement {
             BlockHitResult originHit,
             CopycatBulkTarget originTarget,
             Predicate<PositionTarget> isEligible,
-            int maximum
+            int maximum,
+            Predicate<BlockPos> mayVisit
     ) {
         List<PositionTarget> result = new ArrayList<>(Math.min(maximum, 64));
         ArrayDeque<BlockPos> pending = new ArrayDeque<>();
@@ -239,7 +246,8 @@ public final class BulkMaterialReplacement {
             }
 
             PositionTarget candidate = target == null ? null : new PositionTarget(pos, target);
-            if (candidate == null || target.copycatBlock() != copycatBlock || !isEligible.test(candidate)) {
+            if (candidate == null || target.copycatBlock() != copycatBlock || !isEligible.test(candidate)
+                    || !mayVisit.test(pos)) {
                 continue;
             }
 

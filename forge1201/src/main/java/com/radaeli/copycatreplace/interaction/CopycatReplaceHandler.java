@@ -5,6 +5,7 @@ import com.radaeli.copycatreplace.network.BulkReplaceMode;
 import com.radaeli.copycatreplace.service.BulkMaterialReplacement;
 import com.radaeli.copycatreplace.service.CopycatBulkTarget;
 import com.radaeli.copycatreplace.service.MaterialReplacement;
+import com.radaeli.copycatreplace.service.MaterialEditPermission;
 import com.simibubi.create.content.equipment.wrench.WrenchItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -86,7 +87,11 @@ public final class CopycatReplaceHandler {
                     player.displayClientMessage(Component.translatable(message, changed), true);
                 }
             } else {
-                target.replaceMaterial(player, selection.materialHand(), selection.materialStack());
+                var operation = bulkTarget.hasCustomMaterial(event.getHitVec())
+                        ? MaterialEditPermission.Operation.REPLACE : MaterialEditPermission.Operation.APPLY;
+                if (MaterialEditPermission.mayEdit(level, event.getPos(), player, event.getHitVec(), operation)) {
+                    target.replaceMaterial(player, selection.materialHand(), selection.materialStack());
+                }
             }
         }
     }
