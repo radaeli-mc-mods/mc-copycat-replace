@@ -24,6 +24,9 @@ public final class TestPlatform {
                 net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get().resolve("copycat_replace-common.toml"));
         configWatchRemoved = true;
     }
+    static void name(net.minecraft.world.item.ItemStack stack, net.minecraft.network.chat.Component name) {
+        stack.setHoverName(name);
+    }
     static boolean hasCopycats() { return ModList.get().isLoaded("copycats"); }
     static ServerPlayer player(GameTestHelper h, boolean creative) {
         var p = FakePlayerFactory.get(h.getLevel(), new GameProfile(UUID.randomUUID(), "copycat-test"));

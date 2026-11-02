@@ -19,10 +19,29 @@ import static com.radaeli.copycatreplace.tests.ReplacementScenarios.*;
 final class CopycatsScenarios {
     static List<TestFunction> generate() {
         return List.of(test("copycats_single", CopycatsScenarios::single),
+                test("multipart_selection_connected", h -> selection(h, com.radaeli.copycatreplace.network.SelectionMode.CONNECTED)),
+                test("multipart_selection_plane", h -> selection(h, com.radaeli.copycatreplace.network.SelectionMode.PLANE)),
+                test("multipart_selection_all_types", h -> selection(h, com.radaeli.copycatreplace.network.SelectionMode.ALL_TYPES)),
                 test("multipart_individual_tokens", CopycatsScenarios::individual),
                 test("multipart_bulk_tokens", CopycatsScenarios::bulk),
                 test("multipart_state_only", CopycatsScenarios::orientation),
                 test("multipart_permission_veto", CopycatsScenarios::permission));
+    }
+    private static void selection(GameTestHelper h, com.radaeli.copycatreplace.network.SelectionMode mode) {
+        Fixture a=fixture(h,ORIGIN,false), b=fixture(h,ORIGIN.east(),true);
+        var different= nativeBlock(h,ORIGIN.east(2),Blocks.STONE.defaultBlockState());
+        var p=player(h,false);var hand=equip(p,false,new ItemStack(Items.OAK_PLANKS));
+        p.getInventory().setItem(9,new ItemStack(Items.OAK_PLANKS,2));
+        com.radaeli.copycatreplace.network.BulkReplaceMode.setState(p,true,mode);
+        try {
+            int expected=mode==com.radaeli.copycatreplace.network.SelectionMode.ALL_TYPES?3:2;
+            int changed=BulkMaterialReplacement.replaceConnected(h.getLevel(),a.pos,h.getLevel().getBlockState(a.pos),hit(a.pos),p,hand,p.getItemInHand(hand));
+            check(changed==expected,"Multipart traversal or inventory continuation failed: " + changed);
+            check(b.be.getMaterialItemStorage().getMaterialMap().values().stream().anyMatch(v -> v.is(Blocks.ANDESITE)),"All types changed unrelated multipart material");
+            check(p.getInventory().countItem(Items.STONE)==expected,"Multipart shared token refund mismatch");
+            check(BulkMaterialReplacement.removeConnected(h.getLevel(),a.pos,h.getLevel().getBlockState(a.pos),hit(a.pos),p)==expected,"Multipart removal selection mismatch");
+            check(p.getInventory().countItem(Items.OAK_PLANKS)==3,"Multipart inventory lost or duplicated payment");
+        } finally { com.radaeli.copycatreplace.network.BulkReplaceMode.setDown(p,false); }
     }
     private static void single(GameTestHelper h) {
         BlockPos pos = place(h, ORIGIN, CCBlocks.COPYCAT_BLOCK.getDefaultState(), null);

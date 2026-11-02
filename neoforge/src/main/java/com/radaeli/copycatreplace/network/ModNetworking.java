@@ -13,7 +13,7 @@ public final class ModNetworking {
 
     @SubscribeEvent
     public static void register(RegisterPayloadHandlersEvent event) {
-        event.registrar("1").playToServer(
+        event.registrar("2").playToServer(
                 BulkReplaceKeyStatePayload.TYPE,
                 BulkReplaceKeyStatePayload.STREAM_CODEC,
                 BulkReplaceKeyStatePayload::handle

@@ -11,13 +11,18 @@ import net.minecraftforge.event.TickEvent;
 public final class ClientTestPlatform {
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) { if(e.phase==TickEvent.Phase.END) { ClientValidation.tick(); MultiplayerClientValidation.tick(); } }
     @SubscribeEvent public static void sound(PlaySoundEvent e) { if(e.getSound()!=null) ClientValidation.sound(e.getSound().getLocation().toString()); }
+    static boolean scroll(double delta) {
+        var event = new net.minecraftforge.client.event.InputEvent.MouseScrollingEvent(delta, false, false, false, 0, 0);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event);
+        return event.isCanceled();
+    }
     static void syncLimit(ServerPlayer p) { ConnectedBlockLimitSync.onPlayerLoggedIn(new PlayerEvent.PlayerLoggedInEvent(p)); }
 
     static void verifyPonderMaterial(net.createmod.ponder.api.level.PonderLevel world, net.minecraft.core.BlockPos pos,
             net.minecraft.world.level.block.state.BlockState expected) {
         var state = world.getBlockState(pos);
         var model = net.minecraft.client.Minecraft.getInstance().getBlockRenderer().getBlockModel(state);
-        var data = model.getModelData(world, pos, state, net.minecraftforge.client.model.data.ModelData.EMPTY);
+        var data = model.getModelData(world, pos, state, world.getBlockEntity(pos).getModelData());
         if (!com.simibubi.create.content.decoration.copycat.CopycatModel.getMaterial(data).equals(expected))
             throw new AssertionError("Rendered Ponder model does not match Copycat material at " + pos);
     }

@@ -231,7 +231,7 @@ public final class CreateCopycatAdapter {
         }
 
         materialStack.shrink(1);
-        if (materialStack.isEmpty()) {
+        if (materialStack.isEmpty() && player.getItemInHand(materialHand) == materialStack) {
             player.setItemInHand(materialHand, ItemStack.EMPTY);
         }
         if (!previousMaterialItem.isEmpty()) {

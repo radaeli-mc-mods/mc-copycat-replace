@@ -18,5 +18,12 @@
   "copycat_replace.ponder.material_actions.text_6": "Continue segurando a tecla de ação conectada, use somente uma wrench e deixe a outra mão vazia para remover os materiais iguais.",
   "copycat_replace.ponder.material_actions.text_7": "Grupos seguem faces compartilhadas e o mesmo tipo de Copycat. O limite do servidor, o estoque e as permissões restringem cada ação.",
   "copycat_replace.ponder.material_actions.text_8": "Uma posição bloqueada impede a propagação por esse caminho. O preview é uma estimativa; posições protegidas permanecem intactas.",
-  "copycat_replace.ponder.material_actions.text_9": "Por exemplo, com limite de 2 no servidor, somente duas posições mudam, incluindo o Copycat clicado."
+  "copycat_replace.ponder.material_actions.text_9": "Por exemplo, com limite de 2 no servidor, somente duas posições mudam, incluindo o Copycat clicado.",
+  "hud.copycat_replace.mode": "Seleção: %s (role para alternar)",
+  "selection.copycat_replace.connected": "Conectado",
+  "selection.copycat_replace.plane": "Plano",
+  "selection.copycat_replace.all_types": "Todos os tipos",
+  "copycat_replace.ponder.material_actions.text_10": "No Survival, a pilha da mão é usada primeiro, seguida de itens idênticos do inventário principal. Dados diferentes são preservados.",
+  "copycat_replace.ponder.material_actions.text_11": "Segurando a tecla de ação conectada, role para escolher Conectado, Plano ou Todos os tipos. O HUD mostra a seleção.",
+  "copycat_replace.ponder.material_actions.text_12": "Plano segue o plano da face clicada e mantém o tipo de Copycat. Todos os tipos atravessa formatos suportados. Materiais e permissões continuam filtrados."
 }

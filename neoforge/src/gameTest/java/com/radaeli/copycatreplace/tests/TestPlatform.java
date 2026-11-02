@@ -16,6 +16,9 @@ public final class TestPlatform {
     @GameTestGenerator public static List<TestFunction> generate() { return ReplacementScenarios.generate(); }
     static void syncLimit(ServerPlayer p) { com.radaeli.copycatreplace.network.ConnectedBlockLimitSync.onPlayerLoggedIn(new net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p)); }
     static void prepareConfigMutation() {}
+    static void name(net.minecraft.world.item.ItemStack stack, net.minecraft.network.chat.Component name) {
+        stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, name);
+    }
     static boolean hasCopycats() { return ModList.get().isLoaded("copycats"); }
     static ServerPlayer player(GameTestHelper h, boolean creative) {
         var p = FakePlayerFactory.get(h.getLevel(), new GameProfile(UUID.randomUUID(), "copycat-test"));

@@ -79,6 +79,12 @@ public final class CopycatReplacePonder implements PonderPlugin {
         material(scene, first.east(), Blocks.STONE.defaultBlockState());
         scene.overlay().showText(100).text("For example, with a server limit of 2, only two positions change, including the clicked Copycat.").pointAt(util.vector().topOf(first.east(2))).attachKeyFrame();
         scene.idle(110);
+        scene.overlay().showText(130).text("Survival uses the held stack first, then identical items from your main inventory. Different item data stays untouched.").pointAt(pointer).attachKeyFrame();
+        scene.idle(140);
+        scene.overlay().showText(130).text("While holding the Connected Action key, scroll to choose Connected, Plane or All types. The HUD shows your selection.").pointAt(pointer).attachKeyFrame();
+        scene.idle(140);
+        scene.overlay().showText(130).text("Plane stays on the clicked face plane and keeps the Copycat type. All types crosses supported Copycat shapes. Material and permission filters still apply.").pointAt(pointer).attachKeyFrame();
+        scene.idle(140);
         scene.markAsFinished();
     }
 

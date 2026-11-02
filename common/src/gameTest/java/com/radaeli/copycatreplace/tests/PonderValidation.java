@@ -26,7 +26,7 @@ final class PonderValidation {
             for (int x = 1; x <= 3; x++) check(tutorial.getWorld().getBlockEntity(new BlockPos(x, 1, 2))
                     instanceof CopycatBlockEntity, "Ponder structure lacks Copycat at " + x);
         }
-        for (int i = 1; i <= 9; i++) check(I18n.exists("copycat_replace.ponder.material_actions.text_" + i), "Missing Ponder text " + i);
+        for (int i = 1; i <= 12; i++) check(I18n.exists("copycat_replace.ponder.material_actions.text_" + i), "Missing Ponder text " + i);
         var bulk = java.util.Arrays.stream(Minecraft.getInstance().options.keyMappings)
                 .filter(k -> k.getName().equals("key.copycat_replace.bulk_replace")).findFirst().orElseThrow();
         String text = PonderIndex.getLangAccess().getSpecific(tutorial.getId(), "text_4", bulk.getTranslatedKeyMessage().getString());
@@ -41,9 +41,13 @@ final class PonderValidation {
         }
         check(gold && oak && empty, "Ponder did not demonstrate apply, replace and removal");
         check(count(tutorial, Blocks.STONE) == 2, "Ponder limit example is incorrect");
-        tutorial.reset();
+        // reset() only rewinds the schedule; begin() also restores the virtual world
+        // and clears the finished flag before opening the scene for screenshots.
+        tutorial.begin();
         return tutorial;
     }
+
+    static boolean hasGold(PonderScene scene) { return count(scene, Blocks.GOLD_BLOCK) == 3; }
 
     private static int count(PonderScene scene, net.minecraft.world.level.block.Block material) {
         int count = 0;

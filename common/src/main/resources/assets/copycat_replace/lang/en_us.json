@@ -18,5 +18,12 @@
   "copycat_replace.ponder.material_actions.text_6": "Keep holding the Connected Action key, use only a Wrench and leave the other hand empty to remove matching materials.",
   "copycat_replace.ponder.material_actions.text_7": "Groups follow shared faces and the same Copycat type. The server limit, available stock and build permissions restrict each action.",
   "copycat_replace.ponder.material_actions.text_8": "A denied position blocks propagation through that route. The preview is an estimate; protected positions stay unchanged.",
-  "copycat_replace.ponder.material_actions.text_9": "For example, with a server limit of 2, only two positions change, including the clicked Copycat."
+  "copycat_replace.ponder.material_actions.text_9": "For example, with a server limit of 2, only two positions change, including the clicked Copycat.",
+  "hud.copycat_replace.mode": "Selection: %s (scroll to change)",
+  "selection.copycat_replace.connected": "Connected",
+  "selection.copycat_replace.plane": "Plane",
+  "selection.copycat_replace.all_types": "All types",
+  "copycat_replace.ponder.material_actions.text_10": "Survival uses the held stack first, then identical items from your main inventory. Different item data stays untouched.",
+  "copycat_replace.ponder.material_actions.text_11": "While holding the Connected Action key, scroll to choose Connected, Plane or All types. The HUD shows your selection.",
+  "copycat_replace.ponder.material_actions.text_12": "Plane stays on the clicked face plane and keeps the Copycat type. All types crosses supported Copycat shapes. Material and permission filters still apply."
 }
