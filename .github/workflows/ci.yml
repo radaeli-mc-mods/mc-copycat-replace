@@ -1,0 +1,26 @@
+name: CI
+on:
+  pull_request:
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  ci:
+    uses: radaeli-mc-mods/mc-ci/.github/workflows/mod-ci.yml@main
+  without-copycats:
+    name: Verify without Copycats+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: {persist-credentials: false}
+      - uses: radaeli-mc-mods/mc-ci/actions/setup-build@main
+        with:
+          java: |
+            17
+            21
+      - run: ./gradlew verifyAll -PwithoutCopycats --console=plain --stacktrace
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: reports-without-copycats
+          path: '**/build/reports/**'
+          if-no-files-found: ignore

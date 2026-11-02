@@ -42,9 +42,8 @@ public final class ReplacementScenarios {
     }
     static TestFunction test(String name, Consumer<GameTestHelper> action) {
         return new TestFunction("replacement", "copycat_replace." + name, "copycat_replace:empty", 100, 0, true, h -> {
-            int previous = CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get();
-            try { action.accept(h); h.succeed(); }
-            finally { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous); }
+            action.accept(h);
+            h.succeed();
         });
     }
     static ServerPlayer player(GameTestHelper h, boolean creative) {
@@ -159,18 +158,24 @@ public final class ReplacementScenarios {
         check(!BulkReplaceMode.isDown(a), "Released key remained active");
     }
     private static void limit(GameTestHelper h, int cap) {
-        CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(cap);
-        BlockPos pos = null;
-        for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
-            BlockPos p = nativeBlock(h, ORIGIN.offset(x, 0, z), Blocks.STONE.defaultBlockState());
-            if (pos == null) pos = p;
+        TestPlatform.prepareConfigMutation();
+        int previous = CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get();
+        try {
+            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(cap);
+            BlockPos pos = null;
+            for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
+                BlockPos p = nativeBlock(h, ORIGIN.offset(x, 0, z), Blocks.STONE.defaultBlockState());
+                if (pos == null) pos = p;
+            }
+            ServerPlayer player = player(h, true); InteractionHand hand = equip(player, false, new ItemStack(Items.OAK_PLANKS));
+            var estimate = BulkMaterialReplacement.previewConnected(h.getLevel(), pos, h.getLevel().getBlockState(pos), hit(pos), player, player.getItemInHand(hand), false, cap);
+            check(estimate.count() == cap && estimate.positions().contains(pos), "Preview limit must include origin");
+            int n = BulkMaterialReplacement.replaceConnected(h.getLevel(), pos, h.getLevel().getBlockState(pos), hit(pos), player, hand, player.getItemInHand(hand));
+            check(n == cap, "Wrong configured limit: " + n);
+            check(player.getItemInHand(hand).getCount() == 1 && player.getInventory().countItem(Items.STONE) == 0, "Creative bulk modified inventory");
+        } finally {
+            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous);
         }
-        ServerPlayer player = player(h, true); InteractionHand hand = equip(player, false, new ItemStack(Items.OAK_PLANKS));
-        var estimate = BulkMaterialReplacement.previewConnected(h.getLevel(), pos, h.getLevel().getBlockState(pos), hit(pos), player, player.getItemInHand(hand), false, cap);
-        check(estimate.count() == cap && estimate.positions().contains(pos), "Preview limit must include origin");
-        int n = BulkMaterialReplacement.replaceConnected(h.getLevel(), pos, h.getLevel().getBlockState(pos), hit(pos), player, hand, player.getItemInHand(hand));
-        check(n == cap, "Wrong configured limit: " + n);
-        check(player.getItemInHand(hand).getCount() == 1 && player.getInventory().countItem(Items.STONE) == 0, "Creative bulk modified inventory");
     }
     static void check(boolean value, String message) { if (!value) throw new IllegalStateException(message); }
 }
