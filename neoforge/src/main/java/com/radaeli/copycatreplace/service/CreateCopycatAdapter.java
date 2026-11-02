@@ -76,6 +76,11 @@ public final class CreateCopycatAdapter {
             }
 
             @Override
+            public boolean acceptsMaterial(ItemStack stack, BlockHitResult targetHit) {
+                return copycatBlock.getAcceptedBlockState(level, pos, stack, targetHit.getDirection()) != null;
+            }
+
+            @Override
             public boolean containsMaterial(Block materialBlock) {
                 return copycatBlockEntity.hasCustomMaterial()
                         && copycatBlockEntity.getMaterial().getBlock() == materialBlock;

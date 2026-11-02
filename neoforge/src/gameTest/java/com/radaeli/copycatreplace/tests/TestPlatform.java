@@ -24,6 +24,17 @@ public final class TestPlatform {
         p.setPos(pos.getX()+.5, pos.getY()+1, pos.getZ()+.5);
         return p;
     }
+    static ServerPlayer feedbackPlayer(GameTestHelper h, List<net.minecraft.network.chat.Component> messages) {
+        var p = new net.neoforged.neoforge.common.util.FakePlayer(h.getLevel(), new GameProfile(UUID.randomUUID(), "feedback-test")) {
+            @Override public void displayClientMessage(net.minecraft.network.chat.Component message, boolean actionbar) {
+                if (!actionbar) throw new AssertionError("Feedback must use actionbar");
+                messages.add(message);
+            }
+        };
+        p.setGameMode(GameType.SURVIVAL);
+        p.getAbilities().mayBuild = true;
+        return p;
+    }
     static boolean click(ServerPlayer p, InteractionHand hand, BlockHitResult hit) {
         var event = new PlayerInteractEvent.RightClickBlock(p, hand, hit.getBlockPos(), hit);
         CopycatReplaceHandler.onRightClickBlock(event);

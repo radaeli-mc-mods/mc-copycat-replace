@@ -7,5 +7,16 @@
   "message.copycat_replace.bulk_removed": "Removed material from %s connected Copycat positions",
   "hud.copycat_replace.connected_active": "Connected action: ON",
   "hud.copycat_replace.estimated_blocks": "Estimated blocks: %s",
-  "copycat_replace.config.max_connected_blocks": "Maximum connected Copycat blocks per bulk action"
+  "copycat_replace.config.max_connected_blocks": "Maximum connected Copycat blocks per bulk action",
+  "message.copycat_replace.invalid_material": "This material cannot be used on this Copycat",
+  "copycat_replace.ponder.material_actions.header": "Changing Copycat materials",
+  "copycat_replace.ponder.material_actions.text_1": "Hold a Wrench in your main hand and a material in your offhand. Right-click to replace the material.",
+  "copycat_replace.ponder.material_actions.text_2": "You can also hold the material in your main hand and the Wrench in your offhand.",
+  "copycat_replace.ponder.material_actions.text_3": "Sneak bypasses this addon's replacement. Create's normal Wrench action takes over.",
+  "copycat_replace.ponder.material_actions.text_4": "Hold [%s], your Connected Action key, while right-clicking with Wrench and material to apply to connected empty Copycats.",
+  "copycat_replace.ponder.material_actions.text_5": "With material already applied, the same action replaces matching materials in the group.",
+  "copycat_replace.ponder.material_actions.text_6": "Keep holding the Connected Action key, use only a Wrench and leave the other hand empty to remove matching materials.",
+  "copycat_replace.ponder.material_actions.text_7": "Groups follow shared faces and the same Copycat type. The server limit, available stock and build permissions restrict each action.",
+  "copycat_replace.ponder.material_actions.text_8": "A denied position blocks propagation through that route. The preview is an estimate; protected positions stay unchanged.",
+  "copycat_replace.ponder.material_actions.text_9": "For example, with a server limit of 2, only two positions change, including the clicked Copycat."
 }

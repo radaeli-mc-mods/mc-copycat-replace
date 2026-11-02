@@ -37,6 +37,7 @@ public final class ReplacementScenarios {
         tests.add(test("full_inventory_refund", ReplacementScenarios::fullInventory));
         tests.add(test("player_key_isolation", ReplacementScenarios::keyIsolation));
         for (int cap : List.of(1, 64, 256)) tests.add(test("limit_" + cap, h -> limit(h, cap)));
+        tests.addAll(FeedbackScenarios.generate());
         tests.addAll(PermissionScenarios.generate());
         tests.addAll(MigrationScenarios.generate());
         tests.addAll(ServerConfigScenarios.generate());

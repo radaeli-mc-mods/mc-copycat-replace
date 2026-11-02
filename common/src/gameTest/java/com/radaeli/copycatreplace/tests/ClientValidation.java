@@ -38,6 +38,7 @@ public final class ClientValidation {
     private static int ticks;
     private static boolean requested, prepared, finished;
     private static boolean holdModifier;
+    private static net.createmod.ponder.foundation.PonderScene tutorial;
     private static CompletableFuture<Void> work;
     private static CompletableFuture<Boolean> keyCheck;
     private static BlockPos aim = TARGET;
@@ -104,6 +105,23 @@ public final class ClientValidation {
         step("Closing screen restores held modifier", () -> MC.setScreen(null), () -> serverKey(true));
         step("Releasing key clears preview and server state", () -> { holdModifier=false; KeyMapping.set(KEY,false); }, () -> serverKey(false) && ((List<?>)field("highlightedLines")).isEmpty());
         capture("04-released.png");
+        server("Prepare rejected material", p -> p.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.STICK, 3)));
+        step("Rejected material reaches client actionbar", ClientValidation::click, () -> {
+            try {
+                var message = net.minecraft.client.gui.Gui.class.getDeclaredField("overlayMessage");
+                message.setAccessible(true);
+                var value = (Component) message.get(MC.gui);
+                return value != null && value.getString().equals(Component.translatable("message.copycat_replace.invalid_material").getString());
+            } catch (ReflectiveOperationException e) { throw new RuntimeException(e); }
+        });
+        capture("05-rejected-material.png");
+        step("Ponder loads for both Create Copycats and plays complete timeline", () -> tutorial = PonderValidation.compile(), () -> tutorial != null);
+        step("Open addon Ponder scene", () -> MC.setScreen(new PonderValidation.Screen(tutorial)), () -> MC.screen instanceof PonderValidation.Screen);
+        step("Seek Ponder replacement example", () -> ((PonderValidation.Screen) MC.screen).seekToTime(30), () -> true);
+        capture("06-ponder-replacement.png");
+        step("Seek Ponder connected key example", () -> ((PonderValidation.Screen) MC.screen).seekToTime(350), () -> true);
+        capture("07-ponder-connected.png");
+        step("Close Ponder", () -> MC.setScreen(null), () -> MC.screen == null);
     }
     private static boolean previewCount(int n) { return ((Component)field("estimateText")).getString().contains(Integer.toString(n)); }
     private static boolean serverKey(boolean expected) {

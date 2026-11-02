@@ -13,6 +13,15 @@ public final class ClientTestPlatform {
     @SubscribeEvent public static void sound(PlaySoundEvent e) { if(e.getSound()!=null) ClientValidation.sound(e.getSound().getLocation().toString()); }
     static void syncLimit(ServerPlayer p) { ConnectedBlockLimitSync.onPlayerLoggedIn(new PlayerEvent.PlayerLoggedInEvent(p)); }
 
+    static void verifyPonderMaterial(net.createmod.ponder.api.level.PonderLevel world, net.minecraft.core.BlockPos pos,
+            net.minecraft.world.level.block.state.BlockState expected) {
+        var state = world.getBlockState(pos);
+        var model = net.minecraft.client.Minecraft.getInstance().getBlockRenderer().getBlockModel(state);
+        var data = model.getModelData(world, pos, state, net.neoforged.neoforge.client.model.data.ModelData.EMPTY);
+        if (!com.simibubi.create.content.decoration.copycat.CopycatModel.getMaterial(data).equals(expected))
+            throw new AssertionError("Rendered Ponder model does not match Copycat material at " + pos);
+    }
+
     static void connect() {
         net.minecraft.client.gui.screens.ConnectScreen.startConnecting(new net.minecraft.client.gui.screens.TitleScreen(),
             net.minecraft.client.Minecraft.getInstance(), net.minecraft.client.multiplayer.resolver.ServerAddress.parseString(System.getProperty("copycat_replace.address","127.0.0.1:25585")),

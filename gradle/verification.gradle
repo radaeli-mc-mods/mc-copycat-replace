@@ -50,6 +50,9 @@ tasks.register('verifyArtifact') {
             assert archive.getEntry(project.name == 'forge1201' ? 'META-INF/neoforge.mods.toml' : 'META-INF/mods.toml') == null : 'Wrong loader metadata leaked into artifact'
             assert archive.getEntry('META-INF/LICENSE') != null : 'Missing license'
             assert archive.getEntry('assets/copycat_replace/lang/en_us.json') != null : 'Missing translations'
+            assert archive.getEntry('assets/copycat_replace/lang/pt_br.json') != null : 'Missing Portuguese translations'
+            assert archive.getEntry('assets/copycat_replace/ponder/material_actions.nbt') != null : 'Missing Ponder structure'
+            assert archive.getEntry('com/radaeli/copycatreplace/client/CopycatReplacePonder.class') != null : 'Missing Ponder plugin'
             assert archive.getEntry('com/radaeli/copycatreplace/CopycatReplace.class') != null : 'Missing entrypoint'
             assert !archive.entries().toList().any { it.name.contains('/tests/') || it.name.startsWith('META-INF/jarjar/') } : 'Test classes or dependencies leaked into artifact'
             def text = archive.getInputStream(archive.getEntry(metadataName)).getText('UTF-8')

@@ -34,9 +34,21 @@ public final class BulkMaterialReplacement {
             InteractionHand materialHand,
             ItemStack materialStack
     ) {
+        return applyConnectedResult(level, origin, originState, originHit, player, materialHand, materialStack).changed();
+    }
+
+    public static Result applyConnectedResult(
+            Level level,
+            BlockPos origin,
+            BlockState originState,
+            BlockHitResult originHit,
+            Player player,
+            InteractionHand materialHand,
+            ItemStack materialStack
+    ) {
         CopycatBulkTarget originTarget = findOrigin(level, origin, originState, originHit);
         if (originTarget == null || originTarget.hasCustomMaterial(originHit)) {
-            return 0;
+            return new Result(0, false);
         }
 
         List<PositionTarget> cluster = findCluster(
@@ -49,12 +61,17 @@ public final class BulkMaterialReplacement {
                         translateHit(origin, pos, originHit), MaterialEditPermission.Operation.APPLY)
         );
         int changed = 0;
+        boolean rejected = false;
         BlockState soundMaterial = null;
         for (PositionTarget entry : cluster) {
             if (materialStack.isEmpty()) {
                 break;
             }
             BlockHitResult targetHit = translateHit(origin, entry.pos(), originHit);
+            if (!entry.target().acceptsMaterial(materialStack, translateHit(origin, entry.pos(), originHit))) {
+                rejected = true;
+                continue;
+            }
             BlockState applied = entry.target().applyToEmpty(
                     player, materialHand, materialStack, targetHit
             );
@@ -66,7 +83,7 @@ public final class BulkMaterialReplacement {
             }
         }
         playPlaceSound(level, origin, soundMaterial);
-        return changed;
+        return new Result(changed, rejected);
     }
 
     public static int replaceConnected(
@@ -78,13 +95,25 @@ public final class BulkMaterialReplacement {
             InteractionHand materialHand,
             ItemStack materialStack
     ) {
+        return replaceConnectedResult(level, origin, originState, originHit, player, materialHand, materialStack).changed();
+    }
+
+    public static Result replaceConnectedResult(
+            Level level,
+            BlockPos origin,
+            BlockState originState,
+            BlockHitResult originHit,
+            Player player,
+            InteractionHand materialHand,
+            ItemStack materialStack
+    ) {
         CopycatBulkTarget originTarget = findOrigin(level, origin, originState, originHit);
         if (originTarget == null) {
-            return 0;
+            return new Result(0, false);
         }
         Block sourceMaterial = originTarget.clickedMaterialBlock();
         if (sourceMaterial == null) {
-            return 0;
+            return new Result(0, false);
         }
 
         List<PositionTarget> cluster = findCluster(
@@ -95,10 +124,15 @@ public final class BulkMaterialReplacement {
                         translateHit(origin, pos, originHit), MaterialEditPermission.Operation.REPLACE)
         );
         int changed = 0;
+        boolean rejected = false;
         BlockState soundMaterial = null;
         for (PositionTarget entry : cluster) {
             if (materialStack.isEmpty()) {
                 break;
+            }
+            if (!entry.target().acceptsReplacement(sourceMaterial, materialStack, translateHit(origin, entry.pos(), originHit))) {
+                rejected = true;
+                continue;
             }
             BlockState replaced = entry.target().replaceMatchingMaterial(
                     sourceMaterial,
@@ -115,7 +149,7 @@ public final class BulkMaterialReplacement {
             }
         }
         playPlaceSound(level, origin, soundMaterial);
-        return changed;
+        return new Result(changed, rejected);
     }
 
     public static int removeConnected(
@@ -280,6 +314,10 @@ public final class BulkMaterialReplacement {
                     0.75F
             );
         }
+    }
+
+    public record Result(int changed, boolean materialRejected) {
+        public boolean shouldReportInvalidMaterial() { return changed == 0 && materialRejected; }
     }
 
     private record PositionTarget(BlockPos pos, CopycatBulkTarget target) {
