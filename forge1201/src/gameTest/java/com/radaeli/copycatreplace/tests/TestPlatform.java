@@ -17,9 +17,12 @@ public final class TestPlatform {
     static void syncLimit(ServerPlayer p) { com.radaeli.copycatreplace.network.ConnectedBlockLimitSync.onPlayerLoggedIn(new net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p)); }
     // Forge autosaves ConfigValue.set and its watcher can reload a partially written file.
     // Only the isolated GameTest process disables this watch; gameplay behavior is unchanged.
+    private static boolean configWatchRemoved;
     static void prepareConfigMutation() {
+        if (configWatchRemoved) return;
         com.electronwill.nightconfig.core.file.FileWatcher.defaultInstance().removeWatch(
                 net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get().resolve("copycat_replace-common.toml"));
+        configWatchRemoved = true;
     }
     static boolean hasCopycats() { return ModList.get().isLoaded("copycats"); }
     static ServerPlayer player(GameTestHelper h, boolean creative) {
