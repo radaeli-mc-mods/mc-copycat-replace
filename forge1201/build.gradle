@@ -5,7 +5,15 @@ sourceSets.main.resources.srcDir rootProject.file('common/src/main/resources')
 repositories {
     mavenCentral()
     maven { url = 'https://maven.createmod.net' }
-    maven { url = 'https://maven.ithundxr.dev/mirror' }
+    // Registrate's Maven repositories should not intercept Minecraft or Forge dependencies.
+    maven {
+        url = 'https://maven.tterrag.com'
+        content { includeGroup 'com.tterrag.registrate' }
+    }
+    maven {
+        url = 'https://maven.ithundxr.dev/mirror'
+        content { includeGroup 'com.tterrag.registrate' }
+    }
     flatDir { dirs rootProject.file('libs/forge1201') }
 }
 minecraft {
