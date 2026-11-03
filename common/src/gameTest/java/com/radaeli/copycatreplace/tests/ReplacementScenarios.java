@@ -37,6 +37,11 @@ public final class ReplacementScenarios {
         tests.add(test("full_inventory_refund", ReplacementScenarios::fullInventory));
         tests.add(test("player_key_isolation", ReplacementScenarios::keyIsolation));
         for (int cap : List.of(1, 64, 256)) tests.add(test("limit_" + cap, h -> limit(h, cap)));
+        tests.addAll(InventorySelectionScenarios.generate());
+        tests.addAll(FeedbackScenarios.generate());
+        tests.addAll(PermissionScenarios.generate());
+        tests.addAll(MigrationScenarios.generate());
+        tests.addAll(ServerConfigScenarios.generate());
         if (TestPlatform.hasCopycats()) tests.addAll(CopycatsScenarios.generate());
         return tests;
     }
@@ -174,7 +179,8 @@ public final class ReplacementScenarios {
             check(n == cap, "Wrong configured limit: " + n);
             check(player.getItemInHand(hand).getCount() == 1 && player.getInventory().countItem(Items.STONE) == 0, "Creative bulk modified inventory");
         } finally {
-            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous);
+            try { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous); }
+            finally { TestPlatform.finishConfigMutation(); }
         }
     }
     static void check(boolean value, String message) { if (!value) throw new IllegalStateException(message); }

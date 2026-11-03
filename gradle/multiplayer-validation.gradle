@@ -94,7 +94,11 @@ tasks.register('exportValidationLaunches') {
                 environment: run.environment.findAll { key, value -> System.getenv(key)?.toString() != value.toString() }]
         }
         def serverDir = new File(coordinator, 'server'); serverDir.mkdirs()
-        new File(serverDir, 'eula.txt').text = 'eula=true\n'
+        def eula = new File(serverDir, 'eula.txt')
+        if (!eula.exists()) eula.text = 'eula=false\n'
+        if (!(eula.text =~ /(?m)^\s*eula\s*=\s*true\s*$/).find()) {
+            throw new GradleException("Review the Minecraft EULA and accept it in ${eula} before running a test server")
+        }
         new File(serverDir, 'server.properties').text = "server-ip=127.0.0.1\nserver-port=${port}\nonline-mode=false\nspawn-protection=0\nview-distance=3\nsimulation-distance=3\nlevel-type=minecraft\\:flat\ngenerate-structures=false\nmax-tick-time=180000\n"
         // Preserve variant-specific argument files; later exports may otherwise overwrite them.
         def argumentFiles = files(fileTree(layout.buildDirectory.dir('moddev')) { include '*.txt', '*.xml' },

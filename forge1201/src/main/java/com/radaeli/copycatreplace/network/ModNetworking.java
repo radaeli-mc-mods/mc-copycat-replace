@@ -9,7 +9,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 /** The channel and both directions are registered on client and dedicated server. */
 public final class ModNetworking {
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(CopycatReplace.MOD_ID, "main"), () -> "1", "1"::equals, "1"::equals);
+            new ResourceLocation(CopycatReplace.MOD_ID, "main"), () -> "2", "2"::equals, "2"::equals);
     private ModNetworking() {}
     public static void register() {
         CHANNEL.messageBuilder(BulkReplaceKeyStatePayload.class, 0, NetworkDirection.PLAY_TO_SERVER)

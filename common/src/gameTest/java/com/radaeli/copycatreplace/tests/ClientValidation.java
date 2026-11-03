@@ -38,6 +38,7 @@ public final class ClientValidation {
     private static int ticks;
     private static boolean requested, prepared, finished;
     private static boolean holdModifier;
+    private static net.createmod.ponder.foundation.PonderScene tutorial;
     private static CompletableFuture<Void> work;
     private static CompletableFuture<Boolean> keyCheck;
     private static BlockPos aim = TARGET;
@@ -91,9 +92,22 @@ public final class ClientValidation {
         step("Remapped modifier reaches server", () -> { holdModifier=true; KeyMapping.set(KEY,true); }, () -> serverKey(true));
         step("HUD and outline show three connected positions", () -> {}, () -> previewCount(3) && !((List<?>)field("highlightedLines")).isEmpty());
         capture("01-connected-preview.png");
+        step("Held modifier consumes scroll without changing hotbar slot", () -> {
+            int selected=MC.player.getInventory().selected;
+            if (!ClientTestPlatform.scroll(1) || MC.player.getInventory().selected!=selected)
+                throw new AssertionError("Mode wheel was not consumed safely");
+        }, () -> selection(com.radaeli.copycatreplace.network.SelectionMode.PLANE));
+        step("Second scroll selects all types on server", () -> ClientTestPlatform.scroll(1),
+                () -> selection(com.radaeli.copycatreplace.network.SelectionMode.ALL_TYPES));
+        step("Third scroll returns to connected", () -> ClientTestPlatform.scroll(1),
+                () -> selection(com.radaeli.copycatreplace.network.SelectionMode.CONNECTED));
         step("Real click applies material", ClientValidation::click, () -> material(Blocks.STONE,3));
         step("Placement sound is dispatched", () -> {}, () -> SOUNDS.stream().anyMatch(s -> s.contains("stone.place")));
-        server("Replace material through other hand", p -> p.setItemInHand(InteractionHand.OFF_HAND,new ItemStack(Items.OAK_PLANKS,8)));
+        server("Prepare one held material plus two inventory items", p -> {
+            p.setItemInHand(InteractionHand.OFF_HAND,new ItemStack(Items.OAK_PLANKS));
+            p.getInventory().setItem(9,new ItemStack(Items.OAK_PLANKS,2));
+        });
+        step("Preview counts inventory material beyond hand stack", () -> {}, () -> previewCount(3));
         step("Real click replaces material", ClientValidation::click, () -> material(Blocks.OAK_PLANKS,3));
         capture("02-replaced-preview.png");
         server("Prepare wrench-only removal", p -> p.setItemInHand(InteractionHand.OFF_HAND,ItemStack.EMPTY));
@@ -101,9 +115,42 @@ public final class ClientValidation {
         step("Moving to an empty target clears removable preview", () -> aim=TARGET.east(3), () -> previewCount(0) && ((List<?>)field("highlightedLines")).isEmpty());
         capture("03-moved-preview.png");
         step("Opening screen releases server modifier", () -> MC.setScreen(new PauseScreen(true)), () -> MC.screen instanceof PauseScreen && serverKey(false));
+        step("Screen scroll does not select a mode", () -> {
+            if (ClientTestPlatform.scroll(1)) throw new AssertionError("Addon consumed screen scroll");
+        }, () -> true);
         step("Closing screen restores held modifier", () -> MC.setScreen(null), () -> serverKey(true));
         step("Releasing key clears preview and server state", () -> { holdModifier=false; KeyMapping.set(KEY,false); }, () -> serverKey(false) && ((List<?>)field("highlightedLines")).isEmpty());
         capture("04-released.png");
+        step("Released modifier leaves scroll to normal controls", () -> {
+            if (ClientTestPlatform.scroll(1)) throw new AssertionError("Addon consumed normal scroll");
+        }, () -> true);
+        server("Prepare rejected material", p -> p.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.STICK, 3)));
+        step("Rejected material reaches client actionbar", ClientValidation::click, () -> {
+            try {
+                var message = net.minecraft.client.gui.Gui.class.getDeclaredField("overlayMessageString");
+                message.setAccessible(true);
+                var value = (Component) message.get(MC.gui);
+                return value != null && value.getString().equals(Component.translatable("message.copycat_replace.invalid_material").getString());
+            } catch (ReflectiveOperationException e) { throw new RuntimeException(e); }
+        });
+        capture("05-rejected-material.png");
+        step("Ponder loads for both Create Copycats and plays complete timeline", () -> tutorial = PonderValidation.compile(), () -> tutorial != null);
+        step("Open addon Ponder scene", () -> MC.setScreen(new PonderValidation.Screen(tutorial)), () -> MC.screen instanceof PonderValidation.Screen);
+        step("Seek Ponder replacement example", () -> ((PonderValidation.Screen) MC.screen).seekToTime(30), () -> true);
+        capture("06-ponder-replacement.png");
+        step("Seek Ponder connected key example", () -> ((PonderValidation.Screen) MC.screen).seekToTime(380), () -> PonderValidation.hasGold(tutorial));
+        capture("07-ponder-connected.png");
+        step("Close Ponder", () -> MC.setScreen(null), () -> MC.screen == null);
+    }
+    private static boolean selection(com.radaeli.copycatreplace.network.SelectionMode expected) {
+        if (com.radaeli.copycatreplace.client.CopycatReplaceClientKeys.selection()!=expected) return false;
+        if (keyCheck==null) {
+            var server=MC.getSingleplayerServer(); UUID id=MC.player.getUUID();
+            keyCheck=server.submit(() -> BulkReplaceMode.selection(server.getPlayerList().getPlayer(id))==expected);
+            return false;
+        }
+        if(!keyCheck.isDone()) return false;
+        boolean result=keyCheck.join(); keyCheck=null; return result;
     }
     private static boolean previewCount(int n) { return ((Component)field("estimateText")).getString().contains(Integer.toString(n)); }
     private static boolean serverKey(boolean expected) {

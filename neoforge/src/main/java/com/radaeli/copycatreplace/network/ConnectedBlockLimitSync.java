@@ -8,7 +8,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
-/** Distributes the server's common action limit to clients for accurate previews. */
+/** Sends the live server limit; native SERVER config sync only covers the handshake. */
 public final class ConnectedBlockLimitSync {
     private ConnectedBlockLimitSync() {
     }
@@ -20,7 +20,8 @@ public final class ConnectedBlockLimitSync {
     }
 
     public static void onConfigReloading(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getSpec() != CopycatReplaceConfig.SPEC) {
+        if (event.getConfig().getType() != net.neoforged.fml.config.ModConfig.Type.SERVER
+                || event.getConfig().getSpec() != CopycatReplaceConfig.SPEC) {
             return;
         }
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();

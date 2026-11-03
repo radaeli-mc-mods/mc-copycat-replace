@@ -33,7 +33,7 @@ if (project.name == 'forge1201') {
 tasks.matching { it.name == 'runGameTestServer' }.configureEach { timeout = java.time.Duration.ofMinutes(8) }
 tasks.matching { it.name == 'runClientSmoke' }.configureEach {
     timeout = java.time.Duration.ofMinutes(10)
-    maxHeapSize = '2G'
+    maxHeapSize = providers.gradleProperty('validationClientHeap').getOrElse('2G')
     def result = file(providers.gradleProperty('withoutCopycats').isPresent() ? 'build/client-smoke-create/result.txt' : 'build/client-smoke-copycats/result.txt')
     doFirst { result.parentFile.mkdirs(); result.text = 'RUNNING\n' }
     doLast { if (!result.text.startsWith('PASS\n')) throw new GradleException("Client validation failed; inspect ${result}") }
@@ -50,7 +50,15 @@ tasks.register('verifyArtifact') {
             assert archive.getEntry(project.name == 'forge1201' ? 'META-INF/neoforge.mods.toml' : 'META-INF/mods.toml') == null : 'Wrong loader metadata leaked into artifact'
             assert archive.getEntry('META-INF/LICENSE') != null : 'Missing license'
             assert archive.getEntry('assets/copycat_replace/lang/en_us.json') != null : 'Missing translations'
+            assert archive.getEntry('assets/copycat_replace/lang/pt_br.json') != null : 'Missing Portuguese translations'
+            assert archive.getEntry('assets/copycat_replace/ponder/material_actions.nbt') != null : 'Missing Ponder structure'
+            assert archive.getEntry('com/radaeli/copycatreplace/client/CopycatReplacePonder.class') != null : 'Missing Ponder plugin'
             assert archive.getEntry('com/radaeli/copycatreplace/CopycatReplace.class') != null : 'Missing entrypoint'
+            assert archive.getEntry('com/radaeli/copycatreplace/network/SelectionMode.class') != null : 'Missing selection modes'
+            assert archive.getEntry('com/radaeli/copycatreplace/service/MaterialStock.class') != null : 'Missing inventory stock service'
+            if (project.name == 'neoforge') {
+                assert archive.getEntry('com/radaeli/copycatreplace/client/PonderCopycatModel.class') != null : 'Missing virtual Copycat model support'
+            }
             assert !archive.entries().toList().any { it.name.contains('/tests/') || it.name.startsWith('META-INF/jarjar/') } : 'Test classes or dependencies leaked into artifact'
             def text = archive.getInputStream(archive.getEntry(metadataName)).getText('UTF-8')
             assert !text.contains('${') : 'Unexpanded metadata'

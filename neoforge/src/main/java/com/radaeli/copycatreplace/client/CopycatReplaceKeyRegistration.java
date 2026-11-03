@@ -20,4 +20,9 @@ public final class CopycatReplaceKeyRegistration {
     public static void register(RegisterKeyMappingsEvent event) {
         event.register(CopycatReplaceClientKeys.BULK_REPLACE);
     }
+
+    @SubscribeEvent
+    public static void setup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
+        event.enqueueWork(() -> net.createmod.ponder.foundation.PonderIndex.addPlugin(new CopycatReplacePonder()));
+    }
 }

@@ -137,6 +137,22 @@ public final class CopycatsPlusCompat {
                 }
 
                 @Override
+                public boolean acceptsMaterial(ItemStack stack, BlockHitResult targetHit) {
+                    String property = multiStateBlock.getPropertyFromInteraction(state, level, pos, targetHit, true);
+                    return multiStateBlock.partExists(state, property)
+                            && multiStateBlock.getAcceptedBlockState(property, level, pos, stack, targetHit.getDirection()) != null;
+                }
+
+                @Override
+                public boolean acceptsReplacement(Block sourceMaterial, ItemStack stack, BlockHitResult targetHit) {
+                    MaterialItemStorage storage = blockEntity.getMaterialItemStorage();
+                    return storage.getAllProperties().stream().anyMatch(property ->
+                            multiStateBlock.partExists(state, property) && storage.hasCustomMaterial(property)
+                            && storage.getMaterialItem(property).material().getBlock() == sourceMaterial
+                            && multiStateBlock.getAcceptedBlockState(property, level, pos, stack, targetHit.getDirection()) != null);
+                }
+
+                @Override
                 public boolean containsMaterial(Block materialBlock) {
                     MaterialItemStorage storage = blockEntity.getMaterialItemStorage();
                     for (String property : storage.getAllProperties()) {
@@ -187,11 +203,22 @@ public final class CopycatsPlusCompat {
                     }
 
                     MaterialItemStorage storage = blockEntity.getMaterialItemStorage();
+                    ItemStack materialIdentity = materialStack.copy();
                     BlockState firstChanged = null;
                     for (String property : storage.getAllProperties().stream().sorted(Comparator.naturalOrder()).toList()) {
                         if (!multiStateBlock.partExists(state, property)
                                 || storage.getMaterialItem(property).material().getBlock() != sourceMaterial) {
                             continue;
+                        }
+                        // Finishing the remaining parts can be free after the last
+                        // held item paid the shared material token in this position.
+                        ItemStack payment = materialStack;
+                        if (payment.isEmpty()) {
+                            boolean paid = storage.getAllConsumedItems().stream()
+                                    .anyMatch(stack -> stack.getItem() == materialIdentity.getItem());
+                            if (!paid) break;
+                            payment = materialIdentity.copy();
+                            payment.setCount(1);
                         }
                         BlockState replaced = replaceMultiState(
                                 multiStateBlock,
@@ -203,7 +230,7 @@ public final class CopycatsPlusCompat {
                                 targetHit,
                                 player,
                                 materialHand,
-                                materialStack
+                                payment
                         );
                         if (firstChanged == null && replaced != null) {
                             firstChanged = replaced;
@@ -259,6 +286,11 @@ public final class CopycatsPlusCompat {
                 @Override
                 public boolean hasCustomMaterial(BlockHitResult targetHit) {
                     return blockEntity.hasCustomMaterial();
+                }
+
+                @Override
+                public boolean acceptsMaterial(ItemStack stack, BlockHitResult targetHit) {
+                    return copycatBlock.getAcceptedBlockState(level, pos, stack, targetHit.getDirection()) != null;
                 }
 
                 @Override
@@ -510,7 +542,7 @@ public final class CopycatsPlusCompat {
 
         if (!newMaterialAlreadyPaid) {
             materialStack.shrink(1);
-            if (materialStack.isEmpty()) {
+            if (materialStack.isEmpty() && player.getItemInHand(materialHand) == materialStack) {
                 player.setItemInHand(materialHand, ItemStack.EMPTY);
             }
         }

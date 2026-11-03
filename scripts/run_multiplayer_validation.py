@@ -34,7 +34,7 @@ def expand_vm_files(command, cwd):
 def main():
     directory = Path(sys.argv[1]).resolve()
     launches = json.loads((directory / 'launches.json').read_text())
-    config = Path(launches['runServerMulti']['cwd']) / 'config/copycat_replace-common.toml'
+    config = Path(launches['runServerMulti']['cwd']) / 'world/serverconfig/copycat_replace-server.toml'
     config.parent.mkdir(parents=True, exist_ok=True)
     config.write_text('max_connected_blocks = 3\n')
     for name in ('phase', 'actor.state', 'observer.state', 'result.txt'):
@@ -77,7 +77,7 @@ def main():
                 print('Phase: ' + phase, flush=True)
                 previous = phase
                 if phase == 'reload':
-                    config = Path(launches['runServerMulti']['cwd']) / 'config/copycat_replace-common.toml'
+                    config = Path(launches['runServerMulti']['cwd']) / 'world/serverconfig/copycat_replace-server.toml'
                     config.write_text(re.sub(r'max_connected_blocks\s*=\s*\d+', 'max_connected_blocks = 1', config.read_text()))
             if result:
                 print(result, flush=True)

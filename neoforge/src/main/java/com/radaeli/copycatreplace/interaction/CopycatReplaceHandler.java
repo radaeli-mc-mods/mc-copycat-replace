@@ -5,6 +5,7 @@ import com.radaeli.copycatreplace.network.BulkReplaceMode;
 import com.radaeli.copycatreplace.service.BulkMaterialReplacement;
 import com.radaeli.copycatreplace.service.CopycatBulkTarget;
 import com.radaeli.copycatreplace.service.MaterialReplacement;
+import com.radaeli.copycatreplace.service.MaterialEditPermission;
 import com.simibubi.create.content.equipment.wrench.WrenchItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -70,15 +71,19 @@ public final class CopycatReplaceHandler {
                 }
             } else if (bulkMode) {
                 boolean applying = bulkTarget.clickedMaterialBlock() == null;
-                int changed = applying
-                        ? BulkMaterialReplacement.applyConnected(
+                var result = applying
+                        ? BulkMaterialReplacement.applyConnectedResult(
                                 level, event.getPos(), state, event.getHitVec(), player,
                                 selection.materialHand(), selection.materialStack()
                         )
-                        : BulkMaterialReplacement.replaceConnected(
+                        : BulkMaterialReplacement.replaceConnectedResult(
                                 level, event.getPos(), state, event.getHitVec(), player,
                                 selection.materialHand(), selection.materialStack()
                         );
+                int changed = result.changed();
+                if (result.shouldReportInvalidMaterial()) {
+                    reportInvalidMaterial(player);
+                }
                 if (changed > 0) {
                     String message = applying
                             ? "message.copycat_replace.bulk_applied"
@@ -86,9 +91,21 @@ public final class CopycatReplaceHandler {
                     player.displayClientMessage(Component.translatable(message, changed), true);
                 }
             } else {
-                target.replaceMaterial(player, selection.materialHand(), selection.materialStack());
+                var operation = bulkTarget.hasCustomMaterial(event.getHitVec())
+                        ? MaterialEditPermission.Operation.REPLACE : MaterialEditPermission.Operation.APPLY;
+                if (MaterialEditPermission.mayEdit(level, event.getPos(), player, event.getHitVec(), operation)) {
+                    if (!bulkTarget.acceptsMaterial(selection.materialStack(), event.getHitVec())) {
+                        reportInvalidMaterial(player);
+                    } else {
+                        target.replaceMaterial(player, selection.materialHand(), selection.materialStack());
+                    }
+                }
             }
         }
+    }
+
+    private static void reportInvalidMaterial(Player player) {
+        player.displayClientMessage(Component.translatable("message.copycat_replace.invalid_material"), true);
     }
 
     private static HandSelection selectHands(Player player) {

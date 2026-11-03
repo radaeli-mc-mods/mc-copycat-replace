@@ -2,6 +2,8 @@ package com.radaeli.copycatreplace;
 
 import com.mojang.logging.LogUtils;
 import com.radaeli.copycatreplace.config.CopycatReplaceConfig;
+import com.radaeli.copycatreplace.config.LegacyConfigMigration;
+import com.radaeli.copycatreplace.config.ServerConfigReload;
 import com.radaeli.copycatreplace.interaction.CopycatReplaceHandler;
 import com.radaeli.copycatreplace.network.ConnectedBlockLimitSync;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -23,8 +25,12 @@ public final class CopycatReplace {
     public CopycatReplace() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModNetworking.register();
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, CopycatReplaceConfig.SPEC);
+        LegacyConfigMigration.prepare();
+        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, CopycatReplaceConfig.SPEC);
         modEventBus.addListener(ConnectedBlockLimitSync::onConfigReloading);
+        modEventBus.addListener(ServerConfigReload::onLoading);
+        modEventBus.addListener(ServerConfigReload::onUnloading);
+        MinecraftForge.EVENT_BUS.addListener(ServerConfigReload::onServerTick);
         MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGH, CopycatReplaceHandler::onRightClickBlock);
         MinecraftForge.EVENT_BUS.addListener(ConnectedBlockLimitSync::onPlayerLoggedIn);
         LOGGER.info("Create: Copycat Replace! initialized");

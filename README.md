@@ -61,7 +61,9 @@ It works with Create's Copycats and supports compatible shapes from **Create: Co
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `max_connected_blocks` | 64 | Maximum number of connected Copycat blocks affected by one bulk action. Set it from 1 to 256 in `config/copycat_replace-common.toml`. |
+| `max_connected_blocks` | 64 | Maximum number of connected Copycat positions affected by one bulk action, from 1 to 256. Set it in `copycat_replace-server.toml` on the server. |
+
+On Forge, the file is in `<world>/serverconfig/`. On NeoForge, it is in `config/`; a file in `<world>/serverconfig/` overrides that world. For singleplayer worlds, use `saves/<world>/serverconfig/`.
 
 ---
 

@@ -19,9 +19,29 @@ import static com.radaeli.copycatreplace.tests.ReplacementScenarios.*;
 final class CopycatsScenarios {
     static List<TestFunction> generate() {
         return List.of(test("copycats_single", CopycatsScenarios::single),
+                test("multipart_selection_connected", h -> selection(h, com.radaeli.copycatreplace.network.SelectionMode.CONNECTED)),
+                test("multipart_selection_plane", h -> selection(h, com.radaeli.copycatreplace.network.SelectionMode.PLANE)),
+                test("multipart_selection_all_types", h -> selection(h, com.radaeli.copycatreplace.network.SelectionMode.ALL_TYPES)),
                 test("multipart_individual_tokens", CopycatsScenarios::individual),
                 test("multipart_bulk_tokens", CopycatsScenarios::bulk),
-                test("multipart_state_only", CopycatsScenarios::orientation));
+                test("multipart_state_only", CopycatsScenarios::orientation),
+                test("multipart_permission_veto", CopycatsScenarios::permission));
+    }
+    private static void selection(GameTestHelper h, com.radaeli.copycatreplace.network.SelectionMode mode) {
+        Fixture a=fixture(h,ORIGIN,false), b=fixture(h,ORIGIN.east(),true);
+        var different= nativeBlock(h,ORIGIN.east(2),Blocks.STONE.defaultBlockState());
+        var p=player(h,false);var hand=equip(p,false,new ItemStack(Items.OAK_PLANKS));
+        p.getInventory().setItem(9,new ItemStack(Items.OAK_PLANKS,2));
+        com.radaeli.copycatreplace.network.BulkReplaceMode.setState(p,true,mode);
+        try {
+            int expected=mode==com.radaeli.copycatreplace.network.SelectionMode.ALL_TYPES?3:2;
+            int changed=BulkMaterialReplacement.replaceConnected(h.getLevel(),a.pos,h.getLevel().getBlockState(a.pos),hit(a.pos),p,hand,p.getItemInHand(hand));
+            check(changed==expected,"Multipart traversal or inventory continuation failed: " + changed);
+            check(b.be.getMaterialItemStorage().getMaterialMap().values().stream().anyMatch(v -> v.is(Blocks.ANDESITE)),"All types changed unrelated multipart material");
+            check(p.getInventory().countItem(Items.STONE)==expected,"Multipart shared token refund mismatch");
+            check(BulkMaterialReplacement.removeConnected(h.getLevel(),a.pos,h.getLevel().getBlockState(a.pos),hit(a.pos),p)==expected,"Multipart removal selection mismatch");
+            check(p.getInventory().countItem(Items.OAK_PLANKS)==3,"Multipart inventory lost or duplicated payment");
+        } finally { com.radaeli.copycatreplace.network.BulkReplaceMode.setDown(p,false); }
     }
     private static void single(GameTestHelper h) {
         BlockPos pos = place(h, ORIGIN, CCBlocks.COPYCAT_BLOCK.getDefaultState(), null);
@@ -70,6 +90,25 @@ final class CopycatsScenarios {
         target(h, a.pos).removeMatchingMaterial(Blocks.OAK_PLANKS, p, hit(a.pos));
         check(p.getInventory().countItem(Items.OAK_PLANKS) == beforeRemoval + 1, "Removal duplicated or lost a shared token");
         check(!a.be.getMaterialItemStorage().getMaterialMap().values().stream().anyMatch(s -> s.is(Blocks.OAK_PLANKS)), "Not all matching parts removed");
+    }
+    private static void permission(GameTestHelper h) {
+        Fixture a = fixture(h, ORIGIN, false), b = fixture(h, ORIGIN.east(), true);
+        ServerPlayer p = player(h, false);
+        equip(p, false, new ItemStack(Items.OAK_PLANKS, 4));
+        try (var protection = TestPlatform.protect(p, Set.of(b.pos), true, true)) {
+            int replaced = BulkMaterialReplacement.replaceConnected(h.getLevel(), a.pos,
+                    h.getLevel().getBlockState(a.pos), hit(a.pos), p, InteractionHand.OFF_HAND, p.getOffhandItem());
+            check(replaced == 1 && p.getOffhandItem().getCount() == 3, "Denied multipart position consumed material");
+            check(p.getInventory().countItem(Items.STONE) == 1, "Denied multipart position refunded a token");
+            int removed = BulkMaterialReplacement.removeConnected(h.getLevel(), b.pos,
+                    h.getLevel().getBlockState(b.pos), hit(b.pos), p);
+            check(removed == 0, "Denied multipart origin was removed");
+            var storage = b.be.getMaterialItemStorage();
+            check(storage.getMaterialMap().values().stream().anyMatch(s -> s.is(Blocks.STONE))
+                    && storage.getMaterialMap().values().stream().anyMatch(s -> s.is(Blocks.ANDESITE)), "Denied multipart materials changed");
+            check(storage.getAllConsumedItems().stream().filter(s -> !s.isEmpty()).count() == 2,
+                    "Denied multipart position lost its paid tokens");
+        }
     }
     private static void orientation(GameTestHelper h) {
         Fixture f = fixture(h, ORIGIN, false);

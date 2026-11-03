@@ -62,8 +62,6 @@ public final class ConnectedBulkIndicator {
     private static final float HIGHLIGHT_GREEN = 0.08F;
     private static final float HIGHLIGHT_BLUE = 0.95F;
     private static final float HIGHLIGHT_ALPHA = 0.90F;
-    private static final Component ACTIVE_TEXT =
-            Component.translatable("hud.copycat_replace.connected_active");
 
     private static Component estimateText =
             Component.translatable("hud.copycat_replace.estimated_blocks", "--");
@@ -121,7 +119,7 @@ public final class ConnectedBulkIndicator {
                 player,
                 materialStack,
                 removing,
-                serverMaximum
+                serverMaximum, CopycatReplaceClientKeys.selection()
         );
         setPreview(minecraft.level, estimate.count(), estimate.positions());
     }
@@ -138,11 +136,13 @@ public final class ConnectedBulkIndicator {
         int right = graphics.guiWidth() - 8;
         int firstY = 8;
         int secondY = firstY + minecraft.font.lineHeight + 2;
-        String active = ACTIVE_TEXT.getString();
+        Component activeText = Component.translatable("hud.copycat_replace.mode",
+                Component.translatable("selection.copycat_replace." + CopycatReplaceClientKeys.selection().name().toLowerCase(java.util.Locale.ROOT)));
+        String active = activeText.getString();
         String estimate = estimateText.getString();
         graphics.drawString(
                 minecraft.font,
-                ACTIVE_TEXT,
+                activeText,
                 Math.max(8, right - minecraft.font.width(active)),
                 firstY,
                 0xFFFFFF,
@@ -190,6 +190,8 @@ public final class ConnectedBulkIndicator {
         buffers.endBatch(HIGHLIGHT_LINE_TYPE);
         poseStack.popPose();
     }
+
+    public static void refresh() { ticksSinceRefresh = REFRESH_INTERVAL_TICKS; }
 
     public static void setServerMaximum(int maximum) {
         serverMaximum = Math.max(1, Math.min(CopycatReplaceConfig.MAX_CONNECTED_BLOCKS_LIMIT, maximum));

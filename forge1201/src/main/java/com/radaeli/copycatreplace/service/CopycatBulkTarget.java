@@ -19,6 +19,14 @@ public interface CopycatBulkTarget {
 
     boolean containsMaterial(Block materialBlock);
 
+    /** Read-only acceptance check; call only after permission was granted. */
+    boolean acceptsMaterial(ItemStack materialStack, BlockHitResult hit);
+
+    /** Multipart replacement may affect a matching part other than the one under the hit. */
+    default boolean acceptsReplacement(Block sourceMaterial, ItemStack materialStack, BlockHitResult hit) {
+        return acceptsMaterial(materialStack, hit);
+    }
+
     /** Applies the supplied material to this position's selected empty target. */
     BlockState applyToEmpty(
             Player player,
