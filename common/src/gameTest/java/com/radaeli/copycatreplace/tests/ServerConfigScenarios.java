@@ -7,6 +7,8 @@ import net.minecraft.gametest.framework.TestFunction;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import static com.radaeli.copycatreplace.tests.ReplacementScenarios.check;
 
 /** Exercises the real loader file watcher, including cache invalidation and restoration. */
@@ -18,13 +20,12 @@ final class ServerConfigScenarios {
                 "copycat_replace:empty", 400_000, 0, true, h -> {
             Path path = TestPlatform.serverConfigPath();
             check(path.getFileName().toString().equals("copycat_replace-server.toml"), "Expected a registered SERVER configuration");
-            int previous = CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get();
-            System.out.println("COPYCAT SERVER CONFIG: " + path.toAbsolutePath().normalize() + ", initial=" + previous);
             final String original;
             try { original = Files.readString(path); }
             catch (Exception e) { throw new RuntimeException(e); }
-            int first = previous == 1 ? 3 : 1;
-            int beforeRestore = previous == 2 ? 3 : 2;
+            int persistedLimit = configuredLimit(original);
+            int first = persistedLimit == 1 ? 3 : 1;
+            int beforeRestore = persistedLimit == 2 ? 3 : 2;
             GameTestSequence sequence = h.startSequence().thenIdle(5)
                     .thenExecute(() -> write(path, "max_connected_blocks = " + first + "\n"));
             waitForStableValue(sequence, h, first, "SERVER file reload");
@@ -36,9 +37,16 @@ final class ServerConfigScenarios {
             sequence.thenExecute(() -> write(path, "max_connected_blocks = " + beforeRestore + "\n"));
             waitForStableValue(sequence, h, beforeRestore, "pre-restoration value");
             sequence.thenExecute(() -> write(path, original));
-            waitForStableValue(sequence, h, previous, "SERVER file restoration");
+            waitForStableValue(sequence, h, persistedLimit, "SERVER file restoration");
             sequence.thenSucceed();
         }));
+    }
+
+    private static int configuredLimit(String config) {
+        Matcher matcher = Pattern.compile("(?m)^\\s*max_connected_blocks\\s*=\\s*(\\d+)\\s*(?:#.*)?$")
+                .matcher(config);
+        if (!matcher.find()) throw new AssertionError("SERVER config is missing max_connected_blocks");
+        return Integer.parseInt(matcher.group(1));
     }
 
     private static void waitForStableValue(GameTestSequence sequence, GameTestHelper helper,
