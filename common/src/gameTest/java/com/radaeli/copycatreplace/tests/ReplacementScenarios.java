@@ -179,7 +179,8 @@ public final class ReplacementScenarios {
             check(n == cap, "Wrong configured limit: " + n);
             check(player.getItemInHand(hand).getCount() == 1 && player.getInventory().countItem(Items.STONE) == 0, "Creative bulk modified inventory");
         } finally {
-            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous);
+            try { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous); }
+            finally { TestPlatform.finishConfigMutation(); }
         }
     }
     static void check(boolean value, String message) { if (!value) throw new IllegalStateException(message); }

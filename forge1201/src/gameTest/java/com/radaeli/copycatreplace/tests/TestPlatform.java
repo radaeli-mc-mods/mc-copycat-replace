@@ -15,14 +15,19 @@ import java.util.*;
 public final class TestPlatform {
     @GameTestGenerator public static List<TestFunction> generate() { return ReplacementScenarios.generate(); }
     static void syncLimit(ServerPlayer p) { com.radaeli.copycatreplace.network.ConnectedBlockLimitSync.onPlayerLoggedIn(new net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent(p)); }
-    // Forge autosaves ConfigValue.set and its watcher can reload a partially written file.
-    // Only the isolated GameTest process disables this watch; gameplay behavior is unchanged.
-    private static boolean configWatchRemoved;
+    // Limit scenarios mutate an in-memory config so they do not race Forge's file watcher.
+    private static com.electronwill.nightconfig.core.CommentedConfig originalConfig;
     static void prepareConfigMutation() {
-        if (configWatchRemoved) return;
-        com.electronwill.nightconfig.core.file.FileWatcher.defaultInstance().removeWatch(
-                net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get().resolve("copycat_replace-common.toml"));
-        configWatchRemoved = true;
+        var config = serverConfig();
+        originalConfig = config.getConfigData();
+        int current = com.radaeli.copycatreplace.config.CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get();
+        var temporary = com.electronwill.nightconfig.core.CommentedConfig.inMemory();
+        temporary.set("max_connected_blocks", current);
+        com.radaeli.copycatreplace.config.CopycatReplaceConfig.SPEC.setConfig(temporary);
+    }
+    static void finishConfigMutation() {
+        com.radaeli.copycatreplace.config.CopycatReplaceConfig.SPEC.setConfig(originalConfig);
+        originalConfig = null;
     }
     static void name(net.minecraft.world.item.ItemStack stack, net.minecraft.network.chat.Component name) {
         stack.setHoverName(name);
@@ -52,11 +57,12 @@ public final class TestPlatform {
         return event.isCanceled();
     }
 
-    static java.nio.file.Path serverConfigPath() {
+    private static net.minecraftforge.fml.config.ModConfig serverConfig() {
         var configs = net.minecraftforge.fml.config.ConfigTracker.INSTANCE.configSets().get(net.minecraftforge.fml.config.ModConfig.Type.SERVER);
         return configs.stream().filter(c -> c.getSpec() == com.radaeli.copycatreplace.config.CopycatReplaceConfig.SPEC)
-                .findFirst().orElseThrow().getFullPath();
+                .findFirst().orElseThrow();
     }
+    static java.nio.file.Path serverConfigPath() { return serverConfig().getFullPath(); }
     static Protection protect(ServerPlayer player, Set<net.minecraft.core.BlockPos> denied, boolean denyBreak, boolean denyPlace) {
         return new Protection(player, denied, denyBreak, denyPlace);
     }
