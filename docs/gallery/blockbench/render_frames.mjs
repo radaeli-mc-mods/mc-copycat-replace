@@ -3,17 +3,19 @@
 // Same idea as pets/blockbench/tools/render_cururu.mjs: it is a QA preview, not a Blockbench
 // screenshot or Minecraft runtime evidence (no perspective, simple lighting).
 //
-// Usage: node render_frames.mjs <model.bbmodel> <out.png> [times=0,0.45,...] [view=3q|front] [cols=4]
+// Usage: node render_frames.mjs <model.bbmodel> <out.png> [times=0,0.45,...] [view=pov|3q|front] [cols=3]
+// view=pov uses pov_camera.json next to the model: the player's first-person camera (perspective).
 // Times are seconds in the first animation; the default list is the key moments of the
 // `replace` clip (three impacts, swap, vanish, drop-in and the loop seam at the clip length).
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import {createRequire} from 'node:module';
 const require = createRequire(import.meta.url);
 let sharp;
 try { sharp = require('sharp'); }
 catch { sharp = require('C:/Users/lucca/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/sharp'); }
 
-const [modelPath, outPath, timesArg, viewArg = '3q', colsArg = '4'] = process.argv.slice(2);
+const [modelPath, outPath, timesArg, viewArg = 'pov', colsArg = '3'] = process.argv.slice(2);
 if (!modelPath || !outPath) { console.error('usage: node render_frames.mjs <model.bbmodel> <out.png> [times] [3q|front] [cols]'); process.exit(1); }
 const m = JSON.parse(await fs.readFile(modelPath, 'utf8'));
 const clip = m.animations[0];
@@ -59,7 +61,9 @@ function sample(time) {
     for (const ch of ['rotation', 'position', 'scale']) {
       const ks = (a.keyframes ?? []).filter(k => k.channel === ch).sort((p, q) => p.time - q.time);
       if (!ks.length) continue;
-      const val = k => ['x', 'y', 'z'].map(c => Number(k.data_points[0][c]));
+      // Blockbench plays animated rotations with x and y inverted (BoneAnimator.displayRotation)
+      const flip = ch === 'rotation' ? [-1, -1, 1] : [1, 1, 1];
+      const val = k => ['x', 'y', 'z'].map((c, i) => flip[i] * Number(k.data_points[0][c]));
       let j = ks.findIndex(k => k.time >= time);
       let v;
       if (j < 0) v = val(ks[ks.length - 1]);
@@ -83,10 +87,16 @@ function worldOf(id, pose, cache) {
 }
 
 // ---- camera
+const pov = viewArg === 'pov' ? JSON.parse(await fs.readFile(path.join(path.dirname(modelPath), 'pov_camera.json'), 'utf8')) : null;
 const views = {'3q': [-0.5, 0.42, -0.85], front: [0, 0.12, -1]};
 const cam = norm(views[viewArg] ?? views['3q']);                       // direction towards the camera
 const right = norm(cross([0, 1, 0], cam)), up = cross(cam, right);     // right-handed screen basis
-const CENTER = [5, 17, -2], SS = 2, CELL_W = 380, CELL_H = 400, PX_PER_UNIT = 7.4, HEAD = 32;
+const CENTER = [2, 12, -6], SS = 2, HEAD = 32;
+const CELL_W = pov ? 640 : 400, CELL_H = pov ? Math.round(640 / pov.aspect) : 470, PX_PER_UNIT = 6.6;
+// first-person camera: looks along +Z pitched up, viewer's right is -X
+const P = pov?.position, pp = (pov?.pitch_deg ?? 0) * Math.PI / 180;
+const camF = [0, Math.sin(pp), Math.cos(pp)], camU = [0, Math.cos(pp), -Math.sin(pp)], camR = [-1, 0, 0];
+const FOCAL = pov ? (CELL_H * SS / 2) / Math.tan(pov.fov_vertical_deg * Math.PI / 360) : 0;
 
 // corners listed top-left, top-right, bottom-right, bottom-left as seen from outside the face
 function faceCorners(e) {
@@ -105,6 +115,7 @@ function renderFrame(time) {
   const W = CELL_W * SS, H = CELL_H * SS, px = Buffer.alloc(W * H * 4), depth = new Float64Array(W * H).fill(-Infinity);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = ((Math.floor(x / (24 * SS)) + Math.floor(y / (24 * SS))) % 2) ? 37 : 40; px.set([c, c + 3, c + 4, 255], (y * W + x) * 4);
+    if (pov) { const hy = H / 2 + FOCAL * Math.tan(pp); px.set(y > hy ? [92, 128, 52, 255] : [128, 168, 250, 255], (y * W + x) * 4); }
   }
   const pose = sample(time), cache = new Map(), scale = PX_PER_UNIT * SS;
   const light = norm([-3, 7, -5]);
@@ -113,13 +124,25 @@ function renderFrame(time) {
     const toWorld = q => add(w.p, mv(w.m, add(mv(rel, sub(q, eo)), eo)));
     for (const [name, f] of Object.entries(faceCorners(e))) {
       const face = e.faces[name]; if (!face || face.texture == null) continue;
-      const nrm = norm(mv(w.m, mv(rel, f.n))); if (dot(nrm, cam) <= 0) continue;
+      const nrm = norm(mv(w.m, mv(rel, f.n)));
+      const wp = f.p.map(toWorld);
+      if (pov) { const ctr = wp.reduce((a, q) => add(a, q.map(v => v / 4)), [0, 0, 0]); if (dot(nrm, sub(P, ctr)) <= 0) continue; }
+      else if (dot(nrm, cam) <= 0) continue;
       const tex = textures[face.texture], lit = tex.emissive ? 1 : 0.7 + 0.3 * Math.max(0, dot(nrm, light));
       const [u0, v0, u1, v1] = face.uv, base = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], k = ((face.rotation ?? 0) / 90) | 0;
+      let behind = false;
       const pts = f.p.map((p, i) => {
-        const q = sub(toWorld(p), CENTER), uv = base[((i - k) % 4 + 4) % 4];
-        return [W / 2 + dot(q, right) * scale, H / 2 - dot(q, up) * scale, dot(q, cam), uv[0] * tex.w / tex.uw, uv[1] * tex.h / tex.uh];
+        const uv = base[((i - k) % 4 + 4) % 4], tu = uv[0] * tex.w / tex.uw, tv = uv[1] * tex.h / tex.uh;
+        if (pov) {
+          const q = sub(wp[i], P), z = dot(q, camF);
+          if (z < 0.8) { behind = true; return [0, 0, 0, 0, 0, 1]; }
+          const iw = 1 / z;
+          return [W / 2 + FOCAL * dot(q, camR) * iw, H / 2 - FOCAL * dot(q, camU) * iw, iw, tu * iw, tv * iw, iw];
+        }
+        const q = sub(wp[i], CENTER);
+        return [W / 2 + dot(q, right) * scale, H / 2 - dot(q, up) * scale, dot(q, cam), tu, tv, 1];
       });
+      if (behind) continue;
       for (const ids of [[0, 1, 2], [0, 2, 3]]) {
         const [p, q, r] = ids.map(i => pts[i]);
         const den = (q[1] - r[1]) * (p[0] - r[0]) + (r[0] - q[0]) * (p[1] - r[1]); if (Math.abs(den) < 1e-9) continue;
@@ -130,8 +153,9 @@ function renderFrame(time) {
                 t = ((r[1] - p[1]) * (x + .5 - r[0]) + (p[0] - r[0]) * (y + .5 - r[1])) / den, c = 1 - s - t;
           if (s < -1e-6 || t < -1e-6 || c < -1e-6) continue;
           const z = s * p[2] + t * q[2] + c * r[2], idx = y * W + x; if (z <= depth[idx]) continue;
-          const tx = Math.max(0, Math.min(tex.w - 1, Math.floor(s * p[3] + t * q[3] + c * r[3])));
-          const ty = Math.max(0, Math.min(tex.h - 1, Math.floor(s * p[4] + t * q[4] + c * r[4])));
+          const iw = s * p[5] + t * q[5] + c * r[5];
+          const tx = Math.max(0, Math.min(tex.w - 1, Math.floor((s * p[3] + t * q[3] + c * r[3]) / iw)));
+          const ty = Math.max(0, Math.min(tex.h - 1, Math.floor((s * p[4] + t * q[4] + c * r[4]) / iw)));
           const o = (ty * tex.w + tx) * 4; if (tex.data[o + 3] < 128) continue;
           depth[idx] = z; px.set([Math.min(255, Math.round(tex.data[o] * lit)), Math.min(255, Math.round(tex.data[o + 1] * lit)), Math.min(255, Math.round(tex.data[o + 2] * lit)), 255], idx * 4);
         }
