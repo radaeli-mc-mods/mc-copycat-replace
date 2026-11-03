@@ -31,7 +31,8 @@ final class ServerConfigScenarios {
             sequence.thenExecute(() -> write(path, "max_connected_blocks = 256\n"));
             waitForStableValue(sequence, h, 256, "upper bound reload");
             sequence.thenExecute(() -> write(path, "max_connected_blocks = 0\n"));
-            waitForStableValue(sequence, h, 1, "invalid value clamping");
+            // Forge can restore the default, while NeoForge can clamp to the minimum.
+            waitForStableValue(sequence, h, 1, 64, "invalid value correction");
             sequence.thenExecute(() -> write(path, "max_connected_blocks = " + beforeRestore + "\n"));
             waitForStableValue(sequence, h, beforeRestore, "pre-restoration value");
             sequence.thenExecute(() -> write(path, original));
@@ -42,11 +43,21 @@ final class ServerConfigScenarios {
 
     private static void waitForStableValue(GameTestSequence sequence, GameTestHelper helper,
                                            int expected, String stage) {
+        waitForStableValue(sequence, helper, expected, expected, stage);
+    }
+
+    private static void waitForStableValue(GameTestSequence sequence, GameTestHelper helper,
+                                           int expected, int alternative, String stage) {
         long[] stableSince = {0};
+        int[] lastValue = {-1};
         sequence.thenWaitUntil(() -> {
             int actual = CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get();
-            if (actual != expected) stableSince[0] = 0;
-            helper.assertTrue(actual == expected, "Waiting for " + stage + ": expected " + expected + ", got " + actual);
+            if (actual != lastValue[0]) {
+                lastValue[0] = actual;
+                stableSince[0] = 0;
+            }
+            helper.assertTrue(actual == expected || actual == alternative,
+                    "Waiting for " + stage + ": expected " + expected + " or " + alternative + ", got " + actual);
             if (stableSince[0] == 0) stableSince[0] = System.nanoTime();
             helper.assertTrue(System.nanoTime() - stableSince[0] >= 750_000_000L,
                     "Waiting for " + stage + " to remain stable");

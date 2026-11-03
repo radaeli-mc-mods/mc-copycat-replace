@@ -64,7 +64,8 @@ final class InventorySelectionScenarios {
             check(BulkMaterialReplacement.applyConnected(h.getLevel(),origin,h.getLevel().getBlockState(origin),hit(origin),p,hand,p.getItemInHand(hand))==72,"Group stopped at first stack");
             check(p.getInventory().countItem(Items.GOLD_BLOCK)==0 && p.getItemInHand(hand).isEmpty(),"Exact stock lost or duplicated");
         } finally {
-            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous);
+            try { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous); }
+            finally { TestPlatform.finishConfigMutation(); }
         }
     }
     private static void geometry(GameTestHelper h, SelectionMode mode, Direction face) {
@@ -75,8 +76,11 @@ final class InventorySelectionScenarios {
         var p=player(h,false);var hand=equip(p,false,new ItemStack(Items.GOLD_BLOCK));
         p.getInventory().setItem(9,new ItemStack(Items.GOLD_BLOCK,6));
         var hit=new BlockHitResult(hit(origin).getLocation(),face,origin,false);
+        TestPlatform.prepareConfigMutation();
+        int previousLimit = CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get();
         BulkReplaceMode.setState(p,true,mode);
         try {
+            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(64);
             int expected=mode==SelectionMode.ALL_TYPES?7:mode==SelectionMode.PLANE?(face.getAxis()==Direction.Axis.Z?5:4):6;
             var preview=BulkMaterialReplacement.previewConnected(h.getLevel(),origin,h.getLevel().getBlockState(origin),hit,p,p.getItemInHand(hand),false,64,mode);
             check(preview.count()==expected,"Wrong selection geometry: " + mode + "/" + face + ": " + preview.count());
@@ -84,7 +88,11 @@ final class InventorySelectionScenarios {
             p.setItemInHand(hand,new ItemStack(Items.OAK_PLANKS,7));
             check(BulkMaterialReplacement.replaceConnected(h.getLevel(),origin,h.getLevel().getBlockState(origin),hit,p,hand,p.getItemInHand(hand))==expected,"Replace selection differs");
             check(BulkMaterialReplacement.removeConnected(h.getLevel(),origin,h.getLevel().getBlockState(origin),hit,p)==expected,"Remove selection differs");
-        } finally { BulkReplaceMode.setDown(p,false); }
+        } finally {
+            BulkReplaceMode.setDown(p,false);
+            try { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previousLimit); }
+            finally { TestPlatform.finishConfigMutation(); }
+        }
     }
     private static void permission(GameTestHelper h,SelectionMode mode) {
         var origin=nativeBlock(h,ORIGIN,null);nativeBlock(h,ORIGIN.east(),null);nativeBlock(h,ORIGIN.east(2),null);
