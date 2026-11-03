@@ -125,7 +125,8 @@ final class PermissionScenarios {
                 System.out.println("COPYCAT PERMISSION COST: 256 replacements, 512 veto events, " + elapsed / 1_000_000.0 + " ms (synthetic listener)");
             }
         } finally {
-            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous);
+            try { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(previous); }
+            finally { TestPlatform.finishConfigMutation(); }
         }
     }
 }
