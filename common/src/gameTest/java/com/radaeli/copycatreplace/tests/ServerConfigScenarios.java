@@ -7,6 +7,7 @@ import net.minecraft.gametest.framework.TestFunction;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import static com.radaeli.copycatreplace.tests.ReplacementScenarios.check;
@@ -58,22 +59,35 @@ final class ServerConfigScenarios {
                                            int expected, int alternative, String stage) {
         long[] stableSince = {0};
         int[] lastValue = {-1};
+        long startedAt = System.nanoTime();
         sequence.thenWaitUntil(() -> {
             int actual = CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.get();
             if (actual != lastValue[0]) {
                 lastValue[0] = actual;
                 stableSince[0] = 0;
             }
-            helper.assertTrue(actual == expected || actual == alternative,
-                    "Waiting for " + stage + ": expected " + expected + " or " + alternative + ", got " + actual);
-            if (stableSince[0] == 0) stableSince[0] = System.nanoTime();
-            helper.assertTrue(System.nanoTime() - stableSince[0] >= 750_000_000L,
-                    "Waiting for " + stage + " to remain stable");
+            boolean accepted = actual == expected || actual == alternative;
+            if (accepted) {
+                if (stableSince[0] == 0) stableSince[0] = System.nanoTime();
+                helper.assertTrue(System.nanoTime() - stableSince[0] >= 750_000_000L,
+                        "Waiting for " + stage + " to remain stable");
+            } else {
+                stableSince[0] = 0;
+                helper.assertTrue(System.nanoTime() - startedAt < 10_000_000_000L,
+                        "Timed out waiting for " + stage + ": expected " + expected + " or " + alternative + ", got " + actual);
+            }
         });
     }
 
     private static void write(Path path, String content) {
-        try { Files.writeString(path, content); }
+        Path temporary = path.resolveSibling(path.getFileName() + "." + UUID.randomUUID() + ".tmp");
+        try {
+            Files.writeString(temporary, content);
+            try { Files.move(temporary, path, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING); }
+            catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
         catch (Exception e) { throw new RuntimeException(e); }
     }
 }
