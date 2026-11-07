@@ -2,6 +2,6 @@
   "required": true,
   "package": "com.radaeli.copycatreplace.client.mixin",
   "compatibilityLevel": "JAVA_17",
-  "client": ["MouseHandlerMixin"],
+  "client": ["MouseHandlerMixin", "KeyMappingAccessor"],
   "injectors": { "defaultRequire": 1 }
 }
