@@ -7,6 +7,8 @@ import com.radaeli.copycatreplace.client.ConnectedBulkIndicator;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.AllItems;
 import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
+import net.createmod.catnip.outliner.LineOutline;
+import net.createmod.catnip.outliner.Outliner;
 import net.minecraft.client.*;
 import net.minecraft.client.gui.screens.*;
 import net.minecraft.core.*;
@@ -42,6 +44,9 @@ public final class ClientValidation {
     private static CompletableFuture<Void> work;
     private static CompletableFuture<Boolean> keyCheck;
     private static BlockPos aim = TARGET;
+    private static boolean missTarget, watchOutlines, foreignOutline;
+    private static final Object FOREIGN_OUTLINE = new Object();
+    private static Map<Object, Outliner.OutlineEntry> savedOutlines = Map.of();
     public static void sound(String id) { if (Boolean.getBoolean("copycat_replace.clientSmoke")) SOUNDS.add(id); }
     public static void tick() {
         if (!Boolean.getBoolean("copycat_replace.clientSmoke") || finished) return;
@@ -66,8 +71,10 @@ public final class ClientValidation {
                 Vec3 v = Vec3.atLowerCornerOf(aim).add(.5, .25, .5).subtract(MC.player.getEyePosition());
                 MC.player.setYRot((float) Math.toDegrees(Math.atan2(-v.x, v.z)));
                 MC.player.setXRot((float) -Math.toDegrees(Math.atan2(v.y, Math.sqrt(v.x*v.x+v.z*v.z))));
-                MC.hitResult = hit();
+                MC.hitResult = missTarget ? BlockHitResult.miss(hit().getLocation(), Direction.UP, aim) : hit();
             }
+            if (foreignOutline) Outliner.getInstance().keep(FOREIGN_OUTLINE);
+            if (watchOutlines && !liveOutlines()) throw new AssertionError("Create outlines expired between preview refreshes");
             if (current == null) {
                 current = STEPS.poll();
                 if (current == null) { finish(null); return; }
@@ -90,8 +97,26 @@ public final class ClientValidation {
         });
         step("Receive authoritative server limit", () -> {}, () -> field("serverMaximum").equals(3));
         step("Remapped modifier reaches server", () -> { holdModifier=true; KeyMapping.set(KEY,true); }, () -> serverKey(true));
-        step("HUD and outline show three connected positions", () -> {}, () -> previewCount(3) && !((List<?>)field("highlightedLines")).isEmpty());
+        step("HUD and Create outlines follow three connected step shapes", () -> {},
+                () -> previewCount(3) && liveOutlines() && outlineBoundsMatch(List.of(TARGET, TARGET.east(), TARGET.east(2))));
         capture("01-connected-preview.png");
+        step("Create outlines remain alive and reuse entries across refreshes", () -> {
+            savedOutlines = ownOutlines(); watchOutlines = true;
+        }, () -> ticks >= 30 && ownOutlines().equals(savedOutlines));
+        step("Stop continuous outline check", () -> watchOutlines = false, () -> true);
+        server("Reduce server preview limit", p -> { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(1); ClientTestPlatform.syncLimit(p); });
+        step("Shrinking selection removes old Create segments", () -> {}, () -> previewCount(1) && liveOutlines() && removedOldSegments());
+        capture("08-single-step-preview.png");
+        server("Restore server preview limit", p -> { CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(3); ClientTestPlatform.syncLimit(p); });
+        step("Expanded selection returns to three positions", () -> {}, () -> previewCount(3) && liveOutlines());
+        step("Use small GUI scale", () -> { MC.options.guiScale().set(1); MC.resizeDisplay(); }, () -> true);
+        capture("09-hud-scale-1.png");
+        step("Restore GUI scale", () -> { MC.options.guiScale().set(2); MC.resizeDisplay(); }, () -> true);
+        step("Hide GUI", () -> MC.options.hideGui = true, () -> true);
+        capture("10-hidden-hud.png");
+        step("Restore GUI", () -> MC.options.hideGui = false, () -> true);
+        step("A missed BlockHitResult clears highlights", () -> missTarget = true, () -> previewCount(0) && ownOutlines().isEmpty());
+        step("Looking back restores highlights", () -> missTarget = false, () -> previewCount(3) && liveOutlines());
         step("Held modifier consumes scroll without changing hotbar slot", () -> {
             int selected=MC.player.getInventory().selected;
             if (!ClientTestPlatform.scroll(1) || MC.player.getInventory().selected!=selected)
@@ -112,14 +137,23 @@ public final class ClientValidation {
         capture("02-replaced-preview.png");
         server("Prepare wrench-only removal", p -> p.setItemInHand(InteractionHand.OFF_HAND,ItemStack.EMPTY));
         step("Real click removes connected material", ClientValidation::click, () -> empty(3));
-        step("Moving to an empty target clears removable preview", () -> aim=TARGET.east(3), () -> previewCount(0) && ((List<?>)field("highlightedLines")).isEmpty());
+        step("Moving to an empty target clears removable preview", () -> aim=TARGET.east(3), () -> previewCount(0) && ownOutlines().isEmpty());
         capture("03-moved-preview.png");
-        step("Opening screen releases server modifier", () -> MC.setScreen(new PauseScreen(true)), () -> MC.screen instanceof PauseScreen && serverKey(false));
+        server("Restore material for screen and key cleanup checks", p -> p.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.STONE, 8)));
+        step("Preview is active before opening screen", () -> {
+            aim = TARGET; foreignOutline = true;
+            Outliner.getInstance().showLine(FOREIGN_OUTLINE, Vec3.ZERO, new Vec3(0, 1, 0));
+        }, () -> previewCount(3) && liveOutlines());
+        step("Opening screen removes only addon highlights and releases server modifier", () -> MC.setScreen(new PauseScreen(true)),
+                () -> MC.screen instanceof PauseScreen && serverKey(false) && ownOutlines().isEmpty()
+                        && Outliner.getInstance().getOutlines().containsKey(FOREIGN_OUTLINE));
         step("Screen scroll does not select a mode", () -> {
             if (ClientTestPlatform.scroll(1)) throw new AssertionError("Addon consumed screen scroll");
         }, () -> true);
-        step("Closing screen restores held modifier", () -> MC.setScreen(null), () -> serverKey(true));
-        step("Releasing key clears preview and server state", () -> { holdModifier=false; KeyMapping.set(KEY,false); }, () -> serverKey(false) && ((List<?>)field("highlightedLines")).isEmpty());
+        step("Closing screen restores held modifier and highlights", () -> MC.setScreen(null), () -> serverKey(true) && liveOutlines());
+        step("Releasing key clears preview and server state", () -> { holdModifier=false; KeyMapping.set(KEY,false); },
+                () -> serverKey(false) && ownOutlines().isEmpty() && Outliner.getInstance().getOutlines().containsKey(FOREIGN_OUTLINE));
+        step("Remove independent test highlight", () -> { foreignOutline = false; Outliner.getInstance().remove(FOREIGN_OUTLINE); }, () -> true);
         capture("04-released.png");
         step("Released modifier leaves scroll to normal controls", () -> {
             if (ClientTestPlatform.scroll(1)) throw new AssertionError("Addon consumed normal scroll");
@@ -141,6 +175,95 @@ public final class ClientValidation {
         step("Seek Ponder connected key example", () -> ((PonderValidation.Screen) MC.screen).seekToTime(380), () -> PonderValidation.hasGold(tutorial));
         capture("07-ponder-connected.png");
         step("Close Ponder", () -> MC.setScreen(null), () -> MC.screen == null);
+        visualSelectionChecks();
+    }
+
+    private static void visualSelectionChecks() {
+        server("Prepare connected and plane geometry", p -> {
+            p.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.STONE, 8));
+            for (int i = 0; i < 4; i++) p.serverLevel().setBlockAndUpdate(TARGET.east(i), AllBlocks.COPYCAT_STEP.getDefaultState());
+            p.serverLevel().setBlockAndUpdate(TARGET.above(), AllBlocks.COPYCAT_STEP.getDefaultState());
+            p.serverLevel().setBlockAndUpdate(TARGET.east(4), AllBlocks.COPYCAT_PANEL.getDefaultState());
+            CopycatReplaceConfig.MAX_CONNECTED_BLOCKS.set(64); ClientTestPlatform.syncLimit(p);
+        });
+        step("Connected highlights five same-type positions", () -> { aim = TARGET; holdModifier = true; KeyMapping.set(KEY, true); },
+                () -> previewCount(5) && liveOutlines());
+        step("Plane excludes the vertical neighbor", () -> ClientTestPlatform.scroll(1), () -> previewCount(4) && liveOutlines());
+        capture("11-plane-preview.png");
+        step("All types includes the panel", () -> ClientTestPlatform.scroll(1), () -> previewCount(6) && liveOutlines());
+        capture("12-all-types-preview.png");
+        step("Aim at a thin panel", () -> aim = TARGET.east(4), () -> previewCount(6) && liveOutlines());
+        capture("13-panel-preview.png");
+        step("Return to connected panel selection and preserve its thin shape", () -> ClientTestPlatform.scroll(1),
+                () -> previewCount(1) && liveOutlines() && outlineBoundsMatch(List.of(TARGET.east(4))));
+        capture("14-single-panel-preview.png");
+        server("Survival stock limits the preview", p -> {
+            p.setGameMode(GameType.SURVIVAL); p.getInventory().clearContent();
+            p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(AllItems.WRENCH.get()));
+            p.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.STONE, 2));
+        });
+        step("Partial stock highlights only two steps", () -> aim = TARGET, () -> previewCount(2) && liveOutlines());
+        if (TestPlatform.hasCopycats()) {
+            server("Prepare multipart slab preview", p -> {
+                p.setGameMode(GameType.CREATIVE);
+                MultiplayerCopycats.prepare(p.serverLevel(), TARGET.east(6));
+                p.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.OAK_PLANKS, 8));
+            });
+            step("Multipart Copycat registers Create highlights", () -> aim = TARGET.east(6), () -> previewCount(1) && liveOutlines());
+            capture("15-multipart-preview.png");
+        }
+        server("Change dimension with selection key held", p -> {
+            p.setGameMode(GameType.CREATIVE);
+            p.getServer().getCommands().performPrefixedCommand(p.createCommandSourceStack(),
+                    "execute in minecraft:the_nether run tp @s 0.5 70 0.5");
+        });
+        step("Dimension change clears previous world highlights", () -> {}, () -> MC.level != null && MC.level.dimension().equals(Level.NETHER)
+                && ownOutlines().isEmpty() && field("previewLevel") == MC.level);
+        server("Place a Copycat in the new dimension without resending the limit", p ->
+                p.serverLevel().setBlockAndUpdate(TARGET, AllBlocks.COPYCAT_PANEL.getDefaultState()));
+        step("Preview resumes in the new dimension with the existing server limit", () -> aim = TARGET,
+                () -> previewCount(1) && liveOutlines() && field("serverMaximum").equals(64));
+        step("Disconnect clears highlights and server limit", ClientTestPlatform::disconnect,
+                () -> MC.player == null && ownOutlines().isEmpty() && field("serverMaximum").equals(-1));
+    }
+
+    private static Map<Object, Outliner.OutlineEntry> ownOutlines() {
+        Map<Object, Outliner.OutlineEntry> result = new HashMap<>();
+        Outliner.getInstance().getOutlines().forEach((key, entry) -> {
+            if (key.getClass().getName().equals(ConnectedBulkIndicator.class.getName() + "$OutlineSlot")) result.put(key, entry);
+        });
+        return result;
+    }
+
+    private static boolean liveOutlines() {
+        var entries = ownOutlines();
+        return !entries.isEmpty() && entries.values().stream().allMatch(entry -> !entry.isFading()
+                && entry.getOutline() instanceof LineOutline && entry.getOutline().getParams().getLineWidth() == 1 / 32.0F);
+    }
+
+    private static boolean removedOldSegments() {
+        Set<Object> removed = new HashSet<>(savedOutlines.keySet());
+        removed.removeAll(ownOutlines().keySet());
+        return !removed.isEmpty() && removed.stream().noneMatch(Outliner.getInstance().getOutlines()::containsKey);
+    }
+
+    private static boolean outlineBoundsMatch(List<BlockPos> positions) {
+        AABB expected = null, actual = null;
+        for (BlockPos pos : positions) {
+            AABB shape = MC.level.getBlockState(pos).getShape(MC.level, pos).bounds().move(pos);
+            expected = expected == null ? shape : expected.minmax(shape);
+        }
+        try {
+            for (var entry : ownOutlines().values()) {
+                for (String name : List.of("start", "end")) {
+                    var field = LineOutline.class.getDeclaredField(name); field.setAccessible(true);
+                    var point = (org.joml.Vector3d) field.get(entry.getOutline());
+                    AABB endpoint = new AABB(point.x, point.y, point.z, point.x, point.y, point.z);
+                    actual = actual == null ? endpoint : actual.minmax(endpoint);
+                }
+            }
+        } catch (ReflectiveOperationException e) { throw new RuntimeException(e); }
+        return expected != null && expected.equals(actual);
     }
     private static boolean selection(com.radaeli.copycatreplace.network.SelectionMode expected) {
         if (com.radaeli.copycatreplace.client.CopycatReplaceClientKeys.selection()!=expected) return false;
@@ -152,7 +275,9 @@ public final class ClientValidation {
         if(!keyCheck.isDone()) return false;
         boolean result=keyCheck.join(); keyCheck=null; return result;
     }
-    private static boolean previewCount(int n) { return ((Component)field("estimateText")).getString().contains(Integer.toString(n)); }
+    private static boolean previewCount(int n) {
+        return ((Component)field("estimateText")).getString().equals(Component.translatable("hud.copycat_replace.estimated_blocks", n).getString());
+    }
     private static boolean serverKey(boolean expected) {
         // Read after a server-thread barrier, never inspect mutable server state directly on the render thread.
         var server = MC.getSingleplayerServer();

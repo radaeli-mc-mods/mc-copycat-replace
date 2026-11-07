@@ -1,17 +1,12 @@
 package com.radaeli.copycatreplace.client;
 
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import com.radaeli.copycatreplace.CopycatReplace;
 import com.radaeli.copycatreplace.config.CopycatReplaceConfig;
 import com.radaeli.copycatreplace.service.BulkMaterialReplacement;
 import com.radaeli.copycatreplace.service.BulkMaterialReplacement.PreviewEstimate;
 import com.simibubi.create.content.equipment.wrench.WrenchItem;
+import net.createmod.catnip.outliner.Outliner;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -21,6 +16,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraftforge.api.distmarker.Dist;
@@ -28,7 +24,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.client.event.RenderGuiEvent;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,24 +31,27 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalDouble;
 import java.util.Set;
 
 /** Shows the connected-action key state and a bounded client-side estimate. */
 @EventBusSubscriber(modid = CopycatReplace.MOD_ID, value = Dist.CLIENT)
 public final class ConnectedBulkIndicator {
     private static final int REFRESH_INTERVAL_TICKS = 5;
-    private static final RenderType HIGHLIGHT_LINE_TYPE = ConnectedOutlineRenderType.TYPE;
-    private static final float HIGHLIGHT_RED = 0.55F;
-    private static final float HIGHLIGHT_GREEN = 0.08F;
-    private static final float HIGHLIGHT_BLUE = 0.95F;
-    private static final float HIGHLIGHT_ALPHA = 0.90F;
+    // Matches Create's Schematic and Quill selection outline.
+    private static final int HIGHLIGHT_COLOR = 0x6886C5;
+    private static final float HIGHLIGHT_WIDTH = 1 / 32.0F;
 
     private static Component estimateText =
             Component.translatable("hud.copycat_replace.estimated_blocks", "--");
     private static int ticksSinceRefresh = REFRESH_INTERVAL_TICKS;
     private static int serverMaximum = -1;
-    private static List<LineSegment> highlightedLines = List.of();
+    private static Set<OutlineSlot> highlightedSlots = Set.of();
+    private static Level previewLevel;
+    private static BlockPos previousTarget;
+    private static Direction previousFace;
+    private static BlockState previousState;
+    private static ItemStack previousMainHand = ItemStack.EMPTY;
+    private static ItemStack previousOffHand = ItemStack.EMPTY;
 
     private ConnectedBulkIndicator() {
     }
@@ -62,11 +60,13 @@ public final class ConnectedBulkIndicator {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft minecraft = Minecraft.getInstance();
+        if (previewLevel != minecraft.level) {
+            clearPreview();
+            previewLevel = minecraft.level;
+        }
         if (minecraft.player == null || minecraft.level == null || minecraft.screen != null
                 || !CopycatReplaceClientKeys.BULK_REPLACE.isDown()) {
-            ticksSinceRefresh = REFRESH_INTERVAL_TICKS;
-            estimateText = Component.translatable("hud.copycat_replace.estimated_blocks", "--");
-            highlightedLines = List.of();
+            clearPreview();
             if (minecraft.player == null || minecraft.level == null) {
                 serverMaximum = -1;
             }
@@ -74,18 +74,13 @@ public final class ConnectedBulkIndicator {
         }
 
         if (serverMaximum < 1) {
-            estimateText = Component.translatable("hud.copycat_replace.estimated_blocks", "--");
-            highlightedLines = List.of();
+            clearPreview();
             return;
         }
 
-        if (++ticksSinceRefresh < REFRESH_INTERVAL_TICKS) {
-            return;
-        }
-        ticksSinceRefresh = 0;
-
-        if (!(minecraft.hitResult instanceof BlockHitResult hit)) {
-            setPreview(minecraft.level, 0, List.of());
+        if (!(minecraft.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            clearPreview();
+            estimateText = Component.translatable("hud.copycat_replace.estimated_blocks", 0);
             return;
         }
 
@@ -94,9 +89,24 @@ public final class ConnectedBulkIndicator {
         boolean removing = isWrenchOnly(player);
         ItemStack materialStack = selectMaterial(player);
         if (!removing && materialStack.isEmpty()) {
-            setPreview(minecraft.level, 0, List.of());
+            clearPreview();
+            estimateText = Component.translatable("hud.copycat_replace.estimated_blocks", 0);
             return;
         }
+
+        boolean changed = !hit.getBlockPos().equals(previousTarget) || hit.getDirection() != previousFace
+                || state != previousState || !ItemStack.matches(previousMainHand, player.getMainHandItem())
+                || !ItemStack.matches(previousOffHand, player.getOffhandItem());
+        if (!changed && ++ticksSinceRefresh < REFRESH_INTERVAL_TICKS) {
+            keepOutlines();
+            return;
+        }
+        ticksSinceRefresh = 0;
+        previousTarget = hit.getBlockPos().immutable();
+        previousFace = hit.getDirection();
+        previousState = state;
+        previousMainHand = player.getMainHandItem().copy();
+        previousOffHand = player.getOffhandItem().copy();
 
         PreviewEstimate estimate = BulkMaterialReplacement.previewConnected(
                 minecraft.level,
@@ -114,68 +124,32 @@ public final class ConnectedBulkIndicator {
     @SubscribeEvent
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.screen != null
+        if (minecraft.player == null || minecraft.options.hideGui || minecraft.screen != null
                 || !CopycatReplaceClientKeys.BULK_REPLACE.isDown()) {
             return;
         }
 
         var graphics = event.getGuiGraphics();
-        int right = graphics.guiWidth() - 8;
-        int firstY = 8;
-        int secondY = firstY + minecraft.font.lineHeight + 2;
         Component activeText = Component.translatable("hud.copycat_replace.mode",
                 Component.translatable("selection.copycat_replace." + CopycatReplaceClientKeys.selection().name().toLowerCase(java.util.Locale.ROOT)));
-        String active = activeText.getString();
-        String estimate = estimateText.getString();
-        graphics.drawString(
-                minecraft.font,
-                activeText,
-                Math.max(8, right - minecraft.font.width(active)),
-                firstY,
-                0xFFFFFF,
-                true
-        );
-        graphics.drawString(
-                minecraft.font,
-                estimateText,
-                Math.max(8, right - minecraft.font.width(estimate)),
-                secondY,
-                0xFFFFFF,
-                true
-        );
-    }
-
-    @SubscribeEvent
-    public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS
-                || highlightedLines.isEmpty()
-                || !CopycatReplaceClientKeys.BULK_REPLACE.isDown()) {
-            return;
-        }
-
-        Minecraft minecraft = Minecraft.getInstance();
-        PoseStack poseStack = event.getPoseStack();
-        Vec3 camera = event.getCamera().getPosition();
-        poseStack.pushPose();
-        poseStack.translate(-camera.x, -camera.y, -camera.z);
-
-        var buffers = minecraft.renderBuffers().bufferSource();
-        VertexConsumer lines = buffers.getBuffer(HIGHLIGHT_LINE_TYPE);
-        for (LineSegment segment : highlightedLines) {
-            float normalX = segment.normalX();
-            float normalY = segment.normalY();
-            float normalZ = segment.normalZ();
-            lines.vertex(poseStack.last().pose(), segment.x1() / 16.0F, segment.y1() / 16.0F,
-                            segment.z1() / 16.0F)
-                    .color(HIGHLIGHT_RED, HIGHLIGHT_GREEN, HIGHLIGHT_BLUE, HIGHLIGHT_ALPHA)
-                    .normal(poseStack.last().normal(), normalX, normalY, normalZ).endVertex();
-            lines.vertex(poseStack.last().pose(), segment.x2() / 16.0F, segment.y2() / 16.0F,
-                            segment.z2() / 16.0F)
-                    .color(HIGHLIGHT_RED, HIGHLIGHT_GREEN, HIGHLIGHT_BLUE, HIGHLIGHT_ALPHA)
-                    .normal(poseStack.last().normal(), normalX, normalY, normalZ).endVertex();
-        }
-        buffers.endBatch(HIGHLIGHT_LINE_TYPE);
-        poseStack.popPose();
+        int textWidth = Math.max(minecraft.font.width(activeText), minecraft.font.width(estimateText));
+        int textHeight = 2 * minecraft.font.lineHeight + 2;
+        // Fit long translations even at large GUI scales; coordinates below are scaled GUI pixels.
+        float scale = Math.min(1.0F, Math.min((graphics.guiWidth() - 16.0F) / Math.max(1, textWidth),
+                (graphics.guiHeight() - 16.0F) / textHeight));
+        if (scale <= 0) return;
+        float centerX = graphics.guiWidth() / 2.0F;
+        float top = Math.min(graphics.guiHeight() / 2.0F + 24,
+                graphics.guiHeight() - 8 - textHeight * scale);
+        var pose = graphics.pose();
+        pose.pushPose();
+        pose.translate(centerX, top, 0);
+        pose.scale(scale, scale, 1);
+        graphics.fill(-textWidth / 2 - 4, -4, (textWidth + 1) / 2 + 4, textHeight + 4, 0xA0000000);
+        graphics.drawString(minecraft.font, activeText, -minecraft.font.width(activeText) / 2, 0, 0xFFFFFF, true);
+        graphics.drawString(minecraft.font, estimateText, -minecraft.font.width(estimateText) / 2,
+                minecraft.font.lineHeight + 2, 0xFFFFFF, true);
+        pose.popPose();
     }
 
     public static void refresh() { ticksSinceRefresh = REFRESH_INTERVAL_TICKS; }
@@ -187,7 +161,41 @@ public final class ConnectedBulkIndicator {
 
     private static void setPreview(Level level, int count, List<BlockPos> positions) {
         estimateText = Component.translatable("hud.copycat_replace.estimated_blocks", count);
-        highlightedLines = createOutline(level, positions);
+        Set<OutlineSlot> next = new HashSet<>();
+        Outliner outliner = Outliner.getInstance();
+        for (LineSegment segment : createOutline(level, positions)) {
+            OutlineSlot slot = new OutlineSlot(segment);
+            next.add(slot);
+            outliner.showLine(slot, new Vec3(segment.x1() / 16.0, segment.y1() / 16.0, segment.z1() / 16.0),
+                            new Vec3(segment.x2() / 16.0, segment.y2() / 16.0, segment.z2() / 16.0))
+                    .colored(HIGHLIGHT_COLOR).lineWidth(HIGHLIGHT_WIDTH);
+        }
+        for (OutlineSlot slot : highlightedSlots) {
+            if (!next.contains(slot)) outliner.remove(slot);
+        }
+        highlightedSlots = Set.copyOf(next);
+    }
+
+    private static void keepOutlines() {
+        Outliner outliner = Outliner.getInstance();
+        for (OutlineSlot slot : highlightedSlots) outliner.keep(slot);
+    }
+
+    private static void clearPreview() {
+        Outliner outliner = Outliner.getInstance();
+        for (OutlineSlot slot : highlightedSlots) outliner.remove(slot);
+        highlightedSlots = Set.of();
+        estimateText = Component.translatable("hud.copycat_replace.estimated_blocks", "--");
+        ticksSinceRefresh = REFRESH_INTERVAL_TICKS;
+        previousTarget = null;
+        previousFace = null;
+        previousState = null;
+        previousMainHand = ItemStack.EMPTY;
+        previousOffHand = ItemStack.EMPTY;
+    }
+
+    /** A private key type prevents collisions with other users of Create's shared Outliner. */
+    private record OutlineSlot(LineSegment segment) {
     }
 
     /** Builds the outline from each block's actual collision shape at 1/16-block resolution. */
@@ -379,17 +387,6 @@ public final class ConnectedBulkIndicator {
     }
 
     private record LineSegment(int x1, int y1, int z1, int x2, int y2, int z2) {
-        private float normalX() {
-            return Integer.compare(x2, x1);
-        }
-
-        private float normalY() {
-            return Integer.compare(y2, y1);
-        }
-
-        private float normalZ() {
-            return Integer.compare(z2, z1);
-        }
     }
 
     private record LineKey(int axis, int fixedA, int fixedB) {
