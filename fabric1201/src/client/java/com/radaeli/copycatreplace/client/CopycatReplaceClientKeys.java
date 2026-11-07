@@ -1,6 +1,7 @@
 package com.radaeli.copycatreplace.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.radaeli.copycatreplace.client.mixin.KeyMappingAccessor;
 import com.radaeli.copycatreplace.network.ModNetworking;
 import com.radaeli.copycatreplace.network.SelectionMode;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -33,7 +34,15 @@ public final class CopycatReplaceClientKeys {
 
     static boolean isActive(Minecraft client) {
         return client.player != null && client.screen == null && client.getOverlay() == null
-                && isConnected() && BULK_REPLACE.isDown();
+                && isConnected() && isBindingPhysicallyDown(client);
+    }
+
+    private static boolean isBindingPhysicallyDown(Minecraft client) {
+        var key = ((KeyMappingAccessor) (Object) BULK_REPLACE).copycatReplace$getKey();
+        if (key.getType() == InputConstants.Type.KEYSYM) {
+            return InputConstants.isKeyDown(client.getWindow().getWindow(), key.getValue());
+        }
+        return BULK_REPLACE.isDown();
     }
 
     public static boolean scroll(long window, double delta) {

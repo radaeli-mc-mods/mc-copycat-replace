@@ -57,7 +57,7 @@ public final class ConnectedBulkIndicator {
             previewLevel = minecraft.level;
         }
         if (minecraft.player == null || minecraft.level == null || minecraft.screen != null
-                || !active) {
+                || !active || !hasSingleWrench(minecraft.player)) {
             clearPreview();
             if (minecraft.player == null || minecraft.level == null) {
                 serverMaximum = -1;
@@ -115,7 +115,7 @@ public final class ConnectedBulkIndicator {
 
     public static void render(Minecraft minecraft, GuiGraphics graphics, boolean active, SelectionMode mode) {
         if (minecraft.player == null || minecraft.options.hideGui || minecraft.screen != null
-                || !active) {
+                || !active || !hasSingleWrench(minecraft.player)) {
             return;
         }
 
@@ -430,6 +430,12 @@ public final class ConnectedBulkIndicator {
         boolean wrenchInOff = offHand.getItem() instanceof WrenchItem;
         return (wrenchInMain && !wrenchInOff && offHand.isEmpty())
                 || (wrenchInOff && !wrenchInMain && mainHand.isEmpty());
+    }
+
+    private static boolean hasSingleWrench(Player player) {
+        ItemStack mainHand = player.getMainHandItem();
+        ItemStack offHand = player.getOffhandItem();
+        return (mainHand.getItem() instanceof WrenchItem) != (offHand.getItem() instanceof WrenchItem);
     }
 
     private static ItemStack selectMaterial(Player player) {
