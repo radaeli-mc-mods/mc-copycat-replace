@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-11-07
+
+### Changed
+
+- Moved the selection mode and estimated block count below the crosshair.
+- Updated the selection outlines to use the same blue as Create's Schematic and Quill.
+
+### Fixed
+
+- Fixed stale selection outlines when looking away, opening a screen, or changing dimensions.
+
 ## [0.3.0] - 2026-11-02
 
 ### Added
