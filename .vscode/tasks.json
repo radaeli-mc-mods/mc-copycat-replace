@@ -66,11 +66,71 @@
       }
     },
     {
+      "label": "Fabric: Build",
+      "type": "process",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": [
+        ":fabric1201:build",
+        "--console=plain"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gradle"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "Verify All",
       "type": "process",
       "command": "${workspaceFolder}\\gradlew.bat",
       "args": [
         "verifyAll",
+        "--console=plain"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gradle"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Forge: Verify",
+      "type": "process",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": [
+        "verifyForge",
+        "--console=plain"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gradle"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Fabric: Verify",
+      "type": "process",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": [
+        "verifyFabric",
         "--console=plain"
       ],
       "options": {
@@ -147,6 +207,26 @@
       }
     },
     {
+      "label": "Fabric: Run Client",
+      "type": "process",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": [
+        "runFabricClient",
+        "--console=plain"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gradle"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "Forge: Run Server",
       "type": "process",
       "command": "${workspaceFolder}\\gradlew.bat",
@@ -172,6 +252,26 @@
       "command": "${workspaceFolder}\\gradlew.bat",
       "args": [
         "runNeoForgeServer",
+        "--console=plain"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gradle"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Fabric: Run Server",
+      "type": "process",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": [
+        "runFabricServer",
         "--console=plain"
       ],
       "options": {
