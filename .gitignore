@@ -43,3 +43,8 @@ runs/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+
+## PNG tests
+
+docs/gallery/png_sequence*
