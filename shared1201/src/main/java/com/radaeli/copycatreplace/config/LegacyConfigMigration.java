@@ -2,18 +2,12 @@ package com.radaeli.copycatreplace.config;
 
 import com.electronwill.nightconfig.toml.TomlParser;
 import com.radaeli.copycatreplace.CopycatReplace;
-import net.minecraftforge.fml.loading.FMLPaths;
 import java.nio.file.*;
 import java.io.IOException;
 
 /** Seeds only missing server configuration files before the loader creates them. */
 public final class LegacyConfigMigration {
     private LegacyConfigMigration() {}
-
-    public static void prepare() {
-        migrate(FMLPaths.CONFIGDIR.get().resolve("copycat_replace-common.toml"),
-                FMLPaths.GAMEDIR.get().resolve(net.minecraftforge.fml.loading.FMLConfig.defaultConfigPath()).resolve("copycat_replace-server.toml"));
-    }
 
     public static boolean migrate(Path legacy, Path destination) {
         if (Files.exists(destination) || !Files.isRegularFile(legacy)) return false;

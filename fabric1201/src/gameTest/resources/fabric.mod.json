@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "copycat_replace_tests",
+  "version": "1",
+  "name": "Copycat Replace Validation",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.radaeli.copycatreplace.tests.ServerTestPlatform"],
+    "fabric-gametest": ["com.radaeli.copycatreplace.tests.TestPlatform"],
+    "client": ["com.radaeli.copycatreplace.tests.ClientTestPlatform"]
+  },
+  "mixins": [{ "config": "copycat_replace.fabric.tests.mixins.json", "environment": "server" }],
+  "depends": { "copycat_replace": "*" }
+}

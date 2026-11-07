@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.radaeli.copycatreplace.CopycatReplace"],
+    "client": ["com.radaeli.copycatreplace.client.CopycatReplaceClient"]
+  },
+  "mixins": [{ "config": "copycat_replace.fabric.client.mixins.json", "environment": "client" }],
+  "depends": {
+    "minecraft": "${minecraft_version}",
+    "java": ">=17",
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": ">=${api_version}",
+    "create": "${create_version}",
+    "forgeconfigapiport": ">=8.0.0",
+    "ponder": ">=1.0.91"
+  },
+  "suggests": { "copycats": "${copycats_version}", "openpartiesandclaims": "${openpac_version}" }
+}

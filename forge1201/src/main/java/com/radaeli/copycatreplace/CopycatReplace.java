@@ -14,6 +14,8 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.loading.FMLConfig;
+import net.minecraftforge.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
 /** Entry point for Create: Copycat Replace!. */
@@ -25,7 +27,8 @@ public final class CopycatReplace {
     public CopycatReplace() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModNetworking.register();
-        LegacyConfigMigration.prepare();
+        LegacyConfigMigration.migrate(FMLPaths.CONFIGDIR.get().resolve("copycat_replace-common.toml"),
+                FMLPaths.GAMEDIR.get().resolve(FMLConfig.defaultConfigPath()).resolve("copycat_replace-server.toml"));
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, CopycatReplaceConfig.SPEC);
         modEventBus.addListener(ConnectedBlockLimitSync::onConfigReloading);
         modEventBus.addListener(ServerConfigReload::onLoading);

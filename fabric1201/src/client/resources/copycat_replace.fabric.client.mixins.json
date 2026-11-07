@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "com.radaeli.copycatreplace.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": ["MouseHandlerMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

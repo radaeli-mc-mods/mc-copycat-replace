@@ -24,3 +24,21 @@ jobs:
           name: reports-without-copycats
           path: '**/build/reports/**'
           if-no-files-found: ignore
+  fabric-openpac:
+    name: Verify Fabric with Open Parties and Claims
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: {persist-credentials: false}
+      - uses: radaeli-mc-mods/mc-ci/actions/setup-build@main
+        with:
+          java: |
+            17
+            21
+      - run: ./gradlew :fabric1201:runGameTestServer -PwithOpenPac --console=plain --stacktrace
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: reports-fabric-openpac
+          path: fabric1201/build/reports/**
+          if-no-files-found: ignore

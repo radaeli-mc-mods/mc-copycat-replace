@@ -6,15 +6,26 @@ plugins {
 allprojects { group = mod_group_id; version = mod_version }
 tasks.register('buildAll') {
     group = 'build'
-    description = 'Builds Forge 1.20.1 and NeoForge 1.21.1 sequentially.'
-    dependsOn ':forge1201:build', ':neoforge:build'
+    description = 'Builds the Forge, NeoForge, and Fabric distribution jars.'
+    dependsOn ':forge1201:build', ':neoforge:build', ':fabric1201:build'
 }
 tasks.register('verifyAll') {
     group = 'verification'
-    description = 'Checks artifacts and runs server GameTests for both loaders.'
-    dependsOn ':forge1201:check', ':neoforge:check', ':forge1201:runGameTestServer', ':neoforge:runGameTestServer'
+    description = 'Checks artifacts and runs server GameTests for all loaders.'
+    dependsOn ':forge1201:check', ':neoforge:check', ':fabric1201:check',
+            ':forge1201:runGameTestServer', ':neoforge:runGameTestServer', ':fabric1201:runGameTestServer'
 }
-['Forge': 'forge1201', 'NeoForge': 'neoforge'].each { label, module ->
+tasks.register('verifyForge') {
+    group = 'verification'
+    description = 'Checks the Forge artifact and runs its server GameTests.'
+    dependsOn ':forge1201:check', ':forge1201:runGameTestServer'
+}
+tasks.register('verifyFabric') {
+    group = 'verification'
+    description = 'Checks the Fabric artifact and runs its server GameTests.'
+    dependsOn ':fabric1201:check', ':fabric1201:runGameTestServer'
+}
+['Forge': 'forge1201', 'NeoForge': 'neoforge', 'Fabric': 'fabric1201'].each { label, module ->
     tasks.register("run${label}Client") { dependsOn ":${module}:runClient" }
     tasks.register("run${label}Server") { dependsOn ":${module}:runServer" }
     tasks.register("run${label}GameTests") { dependsOn ":${module}:runGameTestServer" }
@@ -25,8 +36,12 @@ tasks.named('build') { dependsOn 'buildAll' }
 tasks.named('check') { dependsOn 'verifyAll' }
 tasks.named('wrapper') { gradleVersion = '8.11.1' }
 gradle.projectsEvaluated {
+    project(':forge1201').tasks.matching { it.name == 'runGameTestServer' }.configureEach { mustRunAfter ':forge1201:check' }
     project(':neoforge').tasks.named('build') { mustRunAfter ':forge1201:build' }
     project(':neoforge').tasks.named('check') { mustRunAfter ':forge1201:check' }
     project(':forge1201').tasks.matching { it.name == 'runGameTestServer' }.configureEach { mustRunAfter ':forge1201:check', ':neoforge:check' }
     project(':neoforge').tasks.matching { it.name == 'runGameTestServer' }.configureEach { mustRunAfter ':forge1201:runGameTestServer' }
+    project(':fabric1201').tasks.matching { it.name == 'runGameTestServer' }.configureEach {
+        mustRunAfter ':neoforge:runGameTestServer', ':fabric1201:check'
+    }
 }
