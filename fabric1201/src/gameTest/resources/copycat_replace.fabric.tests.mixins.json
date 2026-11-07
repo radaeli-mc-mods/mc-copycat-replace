@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "com.radaeli.copycatreplace.tests.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": ["GameTestRegistryMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

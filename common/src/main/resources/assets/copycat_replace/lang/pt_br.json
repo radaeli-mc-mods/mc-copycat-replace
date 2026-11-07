@@ -2,6 +2,7 @@
   "modmenu.nameTranslation.copycat_replace": "Create: Copycat Replace!",
   "key.categories.copycat_replace": "Copycat Replace",
   "key.copycat_replace.bulk_replace": "Ação em grupo nos Copycats conectados",
+  "disconnect.copycat_replace.incompatible": "Este servidor exige uma versão compatível de Create: Copycat Replace! para Fabric.",
   "message.copycat_replace.bulk_applied": "Material aplicado a %s posições de Copycat conectadas",
   "message.copycat_replace.bulk_replaced": "Material trocado em %s posições de Copycat conectadas",
   "message.copycat_replace.bulk_removed": "Material removido de %s posições de Copycat conectadas",

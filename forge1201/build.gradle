@@ -2,6 +2,8 @@ plugins { id 'net.minecraftforge.gradle' }
 base.archivesName = "${mod_id}-forge-${forge_minecraft_version}"
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 sourceSets.main.resources.srcDir rootProject.file('common/src/main/resources')
+sourceSets.main.java.srcDir rootProject.file('shared1201/src/main/java')
+sourceSets.main.java.srcDir rootProject.file('shared1201/src/client/java')
 repositories {
     mavenCentral()
     maven { url = 'https://maven.createmod.net' }

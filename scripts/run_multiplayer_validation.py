@@ -34,7 +34,9 @@ def expand_vm_files(command, cwd):
 def main():
     directory = Path(sys.argv[1]).resolve()
     launches = json.loads((directory / 'launches.json').read_text())
-    config = Path(launches['runServerMulti']['cwd']) / 'world/serverconfig/copycat_replace-server.toml'
+    server_launch = launches['runServerMulti']
+    default_config = Path(server_launch['cwd']) / 'world/serverconfig/copycat_replace-server.toml'
+    config = Path(server_launch.get('serverConfig', default_config))
     config.parent.mkdir(parents=True, exist_ok=True)
     config.write_text('max_connected_blocks = 3\n')
     for name in ('phase', 'actor.state', 'observer.state', 'result.txt'):
@@ -62,7 +64,7 @@ def main():
                 while time.monotonic() < deadline:
                     if proc.poll() is not None:
                         raise RuntimeError('Server exited before accepting clients; inspect runServerMulti.log')
-                    path = Path(launch['cwd']) / 'logs/latest.log'
+                    path = directory / (name + '.log')
                     if path.exists() and 'For help, type "help"' in path.read_text(errors='replace'):
                         break
                     time.sleep(1)
@@ -77,7 +79,6 @@ def main():
                 print('Phase: ' + phase, flush=True)
                 previous = phase
                 if phase == 'reload':
-                    config = Path(launches['runServerMulti']['cwd']) / 'world/serverconfig/copycat_replace-server.toml'
                     config.write_text(re.sub(r'max_connected_blocks\s*=\s*\d+', 'max_connected_blocks = 1', config.read_text()))
             if result:
                 print(result, flush=True)

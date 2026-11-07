@@ -1,0 +1,337 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import groovy.xml.XmlSlurper
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+import org.gradle.api.artifacts.transform.TransformAction
+import org.gradle.api.artifacts.transform.TransformOutputs
+import org.gradle.api.artifacts.transform.TransformParameters
+import org.gradle.api.artifacts.transform.InputArtifact
+import org.gradle.api.attributes.Attribute
+import org.gradle.api.file.FileSystemLocation
+import net.fabricmc.loom.configuration.ide.RunConfig
+
+plugins { id 'fabric-loom' version '1.9.2' }
+
+// Loom remaps external mods after stripping their nested jars. Put the exact
+// libraries shipped by Create on the development classpath as separate inputs.
+abstract class NestedFabricMods implements TransformAction<TransformParameters.None> {
+    @InputArtifact
+    abstract Provider<FileSystemLocation> getInputArtifact()
+
+    @Override
+    void transform(TransformOutputs outputs) {
+        def selected = [:]
+        new ZipFile(inputArtifact.get().asFile).withCloseable { zip ->
+            NestedFabricMods.collectNested(zip, selected, 0)
+        }
+        selected.values().each { jar -> outputs.file(jar.name).bytes = jar.bytes }
+    }
+
+    private static void collectNested(ZipFile zip, Map selected, int depth) {
+        def metadata = zip.getInputStream(zip.getEntry('fabric.mod.json')).withCloseable {
+            new JsonSlurper().parse(it)
+        }
+        metadata.jars?.each { nested ->
+            def entry = zip.getEntry(nested.file)
+            if (entry == null) throw new GradleException("Missing Create dependency: ${nested.file}")
+            def name = entry.name.tokenize('/').last()
+            // Loom/Fabric API supply these modules. Forge Config API Port shades NightConfig.
+            if (name ==~ /(?:core-3\.6\.|toml-3\.6\.|mixinextras-fabric-|fabric-data-generation-api-v1-).*/) return
+            byte[] bytes = zip.getInputStream(entry).withCloseable { it.bytes }
+            def temporary = File.createTempFile('create-nested-', '.jar')
+            try {
+                temporary.bytes = bytes
+                new ZipFile(temporary).withCloseable { child ->
+                    def mod = child.getInputStream(child.getEntry('fabric.mod.json')).withCloseable {
+                        new JsonSlurper().parse(it)
+                    }
+                    def current = selected[mod.id]
+                    // Within this pinned distribution, favor direct dependencies, then
+                    // the newer of the Porting Lib versions nested by Ponder and Create.
+                    if (current == null || depth < current.depth ||
+                            (depth == current.depth && mod.version > current.version)) {
+                        selected[mod.id] = [name: name, bytes: bytes, version: mod.version, depth: depth]
+                    }
+                    collectNested(child, selected, depth + 1)
+                }
+            } finally {
+                temporary.delete()
+            }
+        }
+    }
+}
+
+base.archivesName = "${mod_id}-fabric-${fabric_minecraft_version}"
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+loom { splitEnvironmentSourceSets() }
+sourceSets {
+    main {
+        java.srcDir rootProject.file('shared1201/src/main/java')
+        resources.srcDir rootProject.file('common/src/main/resources')
+    }
+    client.java.srcDir rootProject.file('shared1201/src/client/java')
+    gameTest {
+        java.srcDir rootProject.file('common/src/gameTest/java')
+        java.exclude '**/ClientValidation.java', '**/MultiplayerClientValidation.java', '**/PonderValidation.java'
+        resources.srcDir rootProject.file('common/src/gameTest/resources')
+        compileClasspath += main.output + main.compileClasspath
+        runtimeClasspath += main.output + main.runtimeClasspath
+    }
+    gameTestClient {
+        java.srcDir rootProject.file('common/src/gameTest/java')
+        java.include '**/ClientTestPlatform.java', '**/ClientValidation.java',
+                '**/MultiplayerClientValidation.java', '**/PonderValidation.java'
+        compileClasspath += gameTest.output + main.output + client.output + client.compileClasspath
+        runtimeClasspath += gameTest.output + main.output + client.output + client.runtimeClasspath
+    }
+}
+
+repositories {
+    mavenCentral()
+    exclusiveContent {
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
+    }
+}
+
+def createArtifact = 'maven.modrinth:Xbc0uyRg:HAqwA6X1'
+def copycatsArtifact = 'maven.modrinth:UT2M39wf:E0aagkjc'
+def openPacArtifact = 'maven.modrinth:gF3BGWvG:1BXJwNLB'
+def withCopycats = !providers.gradleProperty('withoutCopycats').isPresent()
+def withOpenPac = providers.gradleProperty('withOpenPac').isPresent()
+def runVariant = (withCopycats ? 'copycats' : 'create') + (withOpenPac ? '-openpac' : '')
+def gameTestReport = layout.buildDirectory.file("reports/gametest/${runVariant}.xml")
+def multiplayerDir = layout.buildDirectory.dir("multiplayer-${runVariant}").get().asFile
+def multiplayerPort = 25587
+def artifactType = Attribute.of('artifactType', String)
+configurations {
+    createDistribution { canBeConsumed = false; transitive = false }
+    copycatsDistribution { canBeConsumed = false; transitive = false }
+}
+dependencies {
+    registerTransform(NestedFabricMods) {
+        from.attribute(artifactType, 'jar')
+        to.attribute(artifactType, 'create-nested-jars')
+    }
+    minecraft "com.mojang:minecraft:${fabric_minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    createDistribution createArtifact
+    copycatsDistribution copycatsArtifact
+    modImplementation(createArtifact) { transitive = false }
+    modImplementation files(configurations.createDistribution.incoming.artifactView {
+        attributes.attribute(artifactType, 'create-nested-jars')
+    }.files)
+    modCompileOnly(copycatsArtifact) { transitive = false }
+    if (withCopycats) modLocalRuntime(copycatsArtifact) { transitive = false }
+    modCompileOnly(openPacArtifact) { transitive = false }
+    if (withOpenPac) modLocalRuntime(openPacArtifact) { transitive = false }
+}
+
+def verifyFabricInputs = tasks.register('verifyFabricInputs') {
+    def distributions = [
+            (configurations.createDistribution): 'a613603fb08d967c5a4138d1adb7374c4a347b91e489fe21579a4cff4f40105a',
+            (configurations.copycatsDistribution): 'c952e987ac3b9ee409e5c64ff2c0ef0d0762d1c742bbed251becd97751737049'
+    ]
+    inputs.files(distributions.keySet())
+    doLast {
+        distributions.each { configuration, expected ->
+            def jar = configuration.singleFile
+            def actual = MessageDigest.getInstance('SHA-256').digest(jar.bytes).encodeHex().toString()
+            if (actual != expected) throw new GradleException("Unexpected SHA-256 for ${jar.name}: ${actual}")
+        }
+    }
+}
+
+loom {
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+        "${mod_id}_tests" {
+            sourceSet sourceSets.gameTest
+            sourceSet sourceSets.gameTestClient
+        }
+    }
+    runs {
+        client { runDir "runs/client-${runVariant}" }
+        server { runDir "runs/server-${runVariant}"; programArg '--nogui' }
+        gameTestServer {
+            server()
+            source sourceSets.gameTest
+            runDir "build/gametest-${runVariant}"
+            vmArg '-Dfabric-api.gametest'
+            vmArg '-Dcopycat_replace.onlyOwnGameTests=true'
+            vmArg "-Dfabric-api.gametest.report-file=${gameTestReport.get().asFile.absolutePath}"
+            programArg '--nogui'
+        }
+        clientSmoke {
+            inherit client
+            source sourceSets.gameTestClient
+            runDir "build/client-smoke-${runVariant}"
+            vmArg '-Dcopycat_replace.clientSmoke=true'
+            def language = providers.gradleProperty('validationLanguage').orNull
+            if (language != null) vmArg "-Dcopycat_replace.validationLanguage=${language}"
+        }
+        serverMulti {
+            inherit server
+            source sourceSets.gameTest
+            runDir "build/multiplayer-${runVariant}/server"
+            vmArg '-Dcopycat_replace.multiplayerServer=true'
+            vmArg "-Dcopycat_replace.coordinator=${multiplayerDir.absolutePath}"
+        }
+        ['Actor', 'Observer'].each { role ->
+            create("client${role}") {
+                inherit client
+                source sourceSets.gameTestClient
+                runDir "build/multiplayer-${runVariant}/${role.toLowerCase(Locale.ROOT)}"
+                vmArg "-Dcopycat_replace.multiplayer=${role}"
+                vmArg "-Dcopycat_replace.coordinator=${multiplayerDir.absolutePath}"
+                vmArg "-Dcopycat_replace.address=127.0.0.1:${multiplayerPort}"
+                programArgs '--username', "Copycat${role}", '--width', '960', '--height', '640'
+            }
+        }
+    }
+}
+
+processResources {
+    def properties = [mod_id: mod_id, mod_name: mod_name, mod_version: mod_version, mod_license: mod_license,
+                      minecraft_version: fabric_minecraft_version, loader_version: fabric_loader_version,
+                      api_version: fabric_api_version, create_version: fabric_create_version,
+                      copycats_version: fabric_copycats_version, openpac_version: fabric_openpac_version]
+    inputs.properties properties
+    filesMatching('fabric.mod.json') { expand properties }
+    from(rootProject.file('LICENSE')) { into 'META-INF' }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+    dependsOn verifyFabricInputs
+}
+
+tasks.withType(JavaExec).configureEach {
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) })
+}
+
+tasks.named('runGameTestServer') {
+    timeout = java.time.Duration.ofMinutes(8)
+    def report = gameTestReport.get().asFile
+    doFirst {
+        report.parentFile.mkdirs()
+        if (report.exists() && !report.delete()) throw new GradleException("Could not clear ${report}")
+    }
+    doLast {
+        if (!report.isFile()) throw new GradleException("GameTest did not write ${report}")
+        def cases = new XmlSlurper().parse(report).depthFirst().findAll {
+            it.name() == 'testcase' && it.@name.text().startsWith('copycat_replace.')
+        }
+        if (!cases || cases.any { it.failure.size() || it.error.size() }) {
+            throw new GradleException("Copycat Replace GameTests failed or were absent in ${report}")
+        }
+        def multipartTest = cases.any { it.@name.text() == 'copycat_replace.multipart_bulk_tokens' }
+        if (multipartTest != withCopycats) throw new GradleException("Wrong Copycats+ profile in ${report}")
+        def claimsTest = cases.any { it.@name.text() == 'copycat_replace.openpac_claim_boundary' }
+        if (claimsTest != withOpenPac) throw new GradleException("Wrong OpenPAC profile in ${report}")
+        logger.lifecycle("Verified ${cases.size()} Copycat Replace GameTests (${runVariant})")
+    }
+}
+
+tasks.named('runClientSmoke') {
+    timeout = java.time.Duration.ofMinutes(10)
+    maxHeapSize = providers.gradleProperty('validationClientHeap').getOrElse('2G')
+    def report = layout.buildDirectory.file("client-smoke-${runVariant}/result.txt").get().asFile
+    doFirst {
+        report.parentFile.mkdirs()
+        report.text = 'RUNNING\n'
+    }
+    doLast {
+        if (!report.text.startsWith('PASS\n')) throw new GradleException("Client validation failed; inspect ${report}")
+    }
+}
+
+tasks.register('exportValidationLaunches') {
+    group = 'verification'
+    dependsOn 'remapJar'
+    def launchNames = ['serverMulti', 'clientActor', 'clientObserver']
+    dependsOn {
+        launchNames.collectMany { name ->
+            def run = tasks.named("run${name.capitalize()}").get()
+            run.taskDependencies.getDependencies(run).toList()
+        }
+    }
+    doLast {
+        def serverDir = new File(multiplayerDir, 'server')
+        serverDir.mkdirs()
+        def eula = new File(serverDir, 'eula.txt')
+        if (!eula.exists()) eula.text = 'eula=false\n'
+        if (!(eula.text =~ /(?m)^\s*eula\s*=\s*true\s*$/).find()) {
+            throw new GradleException("Review the Minecraft EULA and accept it in ${eula} before running a test server")
+        }
+        new File(serverDir, 'server.properties').text =
+                "server-ip=127.0.0.1\nserver-port=${multiplayerPort}\nonline-mode=false\nspawn-protection=0\n" +
+                'view-distance=3\nsimulation-distance=3\nlevel-type=minecraft:flat\ngenerate-structures=false\n'
+        def artifact = tasks.named('remapJar').get().archiveFile.get().asFile
+        def addonOutputs = (sourceSets.main.output.files + sourceSets.client.output.files) as Set
+        def launchConfig = file('.gradle/loom-cache/launch.cfg')
+        def remapClasspath = file('.gradle/loom-cache/remapClasspath.txt')
+        def snapshotDir = new File(multiplayerDir, 'launch-config')
+        snapshotDir.mkdirs()
+        def snapshotClasspath = new File(snapshotDir, remapClasspath.name)
+        snapshotClasspath.bytes = remapClasspath.bytes
+        def snapshotConfig = new File(snapshotDir, launchConfig.name)
+        snapshotConfig.text = launchConfig.text.replace(remapClasspath.absolutePath, snapshotClasspath.absolutePath)
+        def launches = launchNames.collectEntries { name ->
+            String taskName = "run${name.capitalize()}"
+            def task = tasks.named(taskName).get()
+            def config = RunConfig.runConfig(project, loom.runs.getByName(name))
+            def classpath = files(task.classpath.files - addonOutputs)
+            def command = [task.javaLauncher.get().executablePath.asFile.absolutePath, '-Xmx2G',
+                           "-Dfabric.addMods=${artifact.absolutePath}"]
+            def vmArgs = config.vmArgs.collect { it.replace(launchConfig.absolutePath, snapshotConfig.absolutePath) }
+            command += vmArgs + ['-classpath', classpath.asPath, config.mainClass] + config.programArgs
+            [(taskName): [command: command, cwd: file(config.runDir).absolutePath,
+                          environment: config.environmentVariables]]
+        }
+        // The 1.20.1 Fabric Config API Port uses the global server file by default.
+        launches.runServerMulti.serverConfig = new File(serverDir, 'config/copycat_replace-server.toml').absolutePath
+        new File(multiplayerDir, 'launches.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(launches))
+        logger.lifecycle("Exported Fabric multiplayer launches to ${multiplayerDir}")
+    }
+}
+
+def remapped = tasks.named('remapJar')
+tasks.register('verifyArtifact') {
+    group = 'verification'
+    dependsOn remapped
+    inputs.file(remapped.flatMap { it.archiveFile })
+    doLast {
+        new ZipFile(remapped.get().archiveFile.get().asFile).withCloseable { zip ->
+            def required = ['fabric.mod.json', 'META-INF/LICENSE', 'copycat_replace.fabric.client.mixins.json',
+                            'assets/copycat_replace/lang/en_us.json', 'assets/copycat_replace/lang/pt_br.json',
+                            'assets/copycat_replace/ponder/material_actions.nbt',
+                            'com/radaeli/copycatreplace/CopycatReplace.class',
+                            'com/radaeli/copycatreplace/client/CopycatReplaceClient.class']
+            required.each { assert zip.getEntry(it) != null : "Missing ${it}" }
+            def metadata = new JsonSlurper().parse(zip.getInputStream(zip.getEntry('fabric.mod.json')))
+            assert metadata.id == mod_id && metadata.version == mod_version.toString()
+            assert metadata.depends.create == fabric_create_version && !metadata.depends.copycats
+            def mixins = new JsonSlurper().parse(zip.getInputStream(zip.getEntry('copycat_replace.fabric.client.mixins.json')))
+            def refmap = zip.getEntry(mixins.refmap)
+            assert refmap != null : 'Missing remapped client Mixin references'
+            assert zip.getInputStream(refmap).getText('UTF-8').contains('class_312;method_1598(JDD)V') :
+                    'Mouse scroll target was not remapped'
+            assert zip.entries().toList().every {
+                !it.name.contains('/tests/') && !it.name.startsWith('META-INF/jars/') &&
+                        !it.name.startsWith('net/minecraft/') && !it.name.startsWith('com/simibubi/')
+            } : 'Test classes or dependencies leaked into the Fabric artifact'
+            def bytes = zip.getInputStream(zip.getEntry('com/radaeli/copycatreplace/CopycatReplace.class')).bytes
+            assert ((bytes[6] & 255) << 8 | (bytes[7] & 255)) == 61 : 'Wrong Java target'
+        }
+    }
+}
+tasks.named('check') { dependsOn 'verifyArtifact' }

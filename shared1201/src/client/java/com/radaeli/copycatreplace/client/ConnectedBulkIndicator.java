@@ -1,12 +1,13 @@
 package com.radaeli.copycatreplace.client;
 
-import com.radaeli.copycatreplace.CopycatReplace;
 import com.radaeli.copycatreplace.config.CopycatReplaceConfig;
 import com.radaeli.copycatreplace.service.BulkMaterialReplacement;
 import com.radaeli.copycatreplace.service.BulkMaterialReplacement.PreviewEstimate;
 import com.simibubi.create.content.equipment.wrench.WrenchItem;
 import net.createmod.catnip.outliner.Outliner;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import com.radaeli.copycatreplace.network.SelectionMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -19,11 +20,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.client.event.RenderGuiEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,7 +30,6 @@ import java.util.Map;
 import java.util.Set;
 
 /** Shows the connected-action key state and a bounded client-side estimate. */
-@EventBusSubscriber(modid = CopycatReplace.MOD_ID, value = Dist.CLIENT)
 public final class ConnectedBulkIndicator {
     private static final int REFRESH_INTERVAL_TICKS = 5;
     // Matches Create's Schematic and Quill selection outline.
@@ -56,16 +51,13 @@ public final class ConnectedBulkIndicator {
     private ConnectedBulkIndicator() {
     }
 
-    @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        Minecraft minecraft = Minecraft.getInstance();
+    public static void tick(Minecraft minecraft, boolean active, SelectionMode mode) {
         if (previewLevel != minecraft.level) {
             clearPreview();
             previewLevel = minecraft.level;
         }
         if (minecraft.player == null || minecraft.level == null || minecraft.screen != null
-                || !CopycatReplaceClientKeys.BULK_REPLACE.isDown()) {
+                || !active) {
             clearPreview();
             if (minecraft.player == null || minecraft.level == null) {
                 serverMaximum = -1;
@@ -116,22 +108,19 @@ public final class ConnectedBulkIndicator {
                 player,
                 materialStack,
                 removing,
-                serverMaximum, CopycatReplaceClientKeys.selection()
+                serverMaximum, mode
         );
         setPreview(minecraft.level, estimate.count(), estimate.positions());
     }
 
-    @SubscribeEvent
-    public static void onRenderGui(RenderGuiEvent.Post event) {
-        Minecraft minecraft = Minecraft.getInstance();
+    public static void render(Minecraft minecraft, GuiGraphics graphics, boolean active, SelectionMode mode) {
         if (minecraft.player == null || minecraft.options.hideGui || minecraft.screen != null
-                || !CopycatReplaceClientKeys.BULK_REPLACE.isDown()) {
+                || !active) {
             return;
         }
 
-        var graphics = event.getGuiGraphics();
         Component activeText = Component.translatable("hud.copycat_replace.mode",
-                Component.translatable("selection.copycat_replace." + CopycatReplaceClientKeys.selection().name().toLowerCase(java.util.Locale.ROOT)));
+                Component.translatable("selection.copycat_replace." + mode.name().toLowerCase(java.util.Locale.ROOT)));
         int textWidth = Math.max(minecraft.font.width(activeText), minecraft.font.width(estimateText));
         int textHeight = 2 * minecraft.font.lineHeight + 2;
         // Fit long translations even at large GUI scales; coordinates below are scaled GUI pixels.
@@ -157,6 +146,12 @@ public final class ConnectedBulkIndicator {
     public static void setServerMaximum(int maximum) {
         serverMaximum = Math.max(1, Math.min(CopycatReplaceConfig.MAX_CONNECTED_BLOCKS_LIMIT, maximum));
         ticksSinceRefresh = REFRESH_INTERVAL_TICKS;
+    }
+
+    public static void disconnect() {
+        clearPreview();
+        previewLevel = null;
+        serverMaximum = -1;
     }
 
     private static void setPreview(Level level, int count, List<BlockPos> positions) {

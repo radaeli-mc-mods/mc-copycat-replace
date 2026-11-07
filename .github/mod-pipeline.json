@@ -22,6 +22,15 @@
       "gameVersions": ["1.20.1"],
       "java": 17,
       "dependencies": ["create(required)", "copycats(optional)"]
+    },
+    {
+      "id": "fabric-1.20.1",
+      "task": ":fabric1201:build",
+      "files": ["fabric1201/build/libs/copycat_replace-fabric-1.20.1-*.jar"],
+      "loaders": ["fabric"],
+      "gameVersions": ["1.20.1"],
+      "java": 17,
+      "dependencies": ["create-fabric(required)", "fabric-api(required)", "copycats(optional)", "open-parties-and-claims(optional)"]
     }
   ]
 }
