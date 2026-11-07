@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-11-07
+
+### Added
+
+- Added a Fabric 1.20.1 version for Create Fabric 6.0.8.1, with optional Copycats+ shapes and Open Parties and Claims protection.
+
+### Fixed
+
+- Fixed the bulk selection overlay appearing without a wrench.
+- Fixed bulk mode failing when Left Alt conflicts with another binding on Fabric.
+
 ## [0.3.1] - 2026-11-07
 
 ### Changed
