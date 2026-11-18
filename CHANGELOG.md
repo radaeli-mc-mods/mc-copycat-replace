@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-11-18
+
+### Changed
+
+- Expanded optional Copycats+ compatibility to version 3.0.5+ on Fabric 1.20.1 and 3.0.4+ on Forge 1.20.1 and NeoForge 1.21.1.
+
 ## [0.4.0] - 2026-11-07
 
 ### Added
