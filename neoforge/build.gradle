@@ -21,9 +21,9 @@ def createJar = rootProject.file('libs/create-1.21.1-6.0.10.jar')
 dependencies {
     implementation files(createJar)
     compileOnly zipTree(createJar).matching { include 'META-INF/jarjar/*.jar' }
-    compileOnly files(rootProject.file('libs/copycats-3.0.4+mc.1.21.1-neoforge.jar'))
+    compileOnly files(rootProject.file('libs/copycats-3.0.11-mc.1.21.1-neoforge.jar'))
     if (!providers.gradleProperty('withoutCopycats').isPresent()) {
-        runtimeOnly files(rootProject.file('libs/copycats-3.0.4+mc.1.21.1-neoforge.jar'))
+        runtimeOnly files(rootProject.file('libs/copycats-3.0.11-mc.1.21.1-neoforge.jar'))
     }
 }
 def metadata = tasks.register('generateModMetadata', ProcessResources) {

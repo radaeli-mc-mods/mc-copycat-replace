@@ -202,7 +202,7 @@ processResources {
     def properties = [mod_id: mod_id, mod_name: mod_name, mod_version: mod_version, mod_license: mod_license,
                       minecraft_version: fabric_minecraft_version, loader_version: fabric_loader_version,
                       api_version: fabric_api_version, create_version: fabric_create_version,
-                      copycats_version: fabric_copycats_version, openpac_version: fabric_openpac_version]
+                      copycats_version: fabric_copycats_version_range, openpac_version: fabric_openpac_version]
     inputs.properties properties
     filesMatching('fabric.mod.json') { expand properties }
     from(rootProject.file('LICENSE')) { into 'META-INF' }

@@ -39,9 +39,9 @@ minecraft {
 dependencies {
     minecraft "net.minecraftforge:forge:${forge_minecraft_version}-${forge_version}"
     implementation fg.deobf('local:create-1.20.1:6.0.8')
-    compileOnly fg.deobf('local:copycats:3.0.4+mc.1.20.1-forge')
+    compileOnly fg.deobf('local:copycats:3.0.10+mc.1.20.1-forge')
     if (!providers.gradleProperty('withoutCopycats').isPresent()) {
-        runtimeOnly fg.deobf('local:copycats:3.0.4+mc.1.20.1-forge')
+        runtimeOnly fg.deobf('local:copycats:3.0.10+mc.1.20.1-forge')
     }
     // The full Create JAR supplies these at runtime through Jar-in-Jar.
     compileOnly fg.deobf('net.createmod.ponder:Ponder-Forge-1.20.1:1.0.91')

@@ -72,7 +72,7 @@ On Forge, the file is in `<world>/serverconfig/`. Fabric and NeoForge use `confi
 - **Minecraft 1.20.1** with **Forge 47.4.0+** and **Create 6.0.8**
 - **Minecraft 1.20.1** with **Fabric Loader 0.17.2+**, **Fabric API 0.92.6+1.20.1** or later for 1.20.1, and **Create Fabric 6.0.8.1 (build 1744)**
 - **Minecraft 1.21.1** with **NeoForge 21.1.236+** and **Create 6.0.10**
-- **Create: Copycats+** is optional. Use **3.0.10** on Fabric and **3.0.4** on Forge or NeoForge.
+- **Create: Copycats+** is optional. The minimum supported versions are **3.0.5** on Fabric and **3.0.4** on Forge or NeoForge.
 - Install the matching Copycat Replace version on **both the client and server**. Install Copycats+ on both sides when you want its additional shapes supported.
 - Fabric servers can use **Open Parties and Claims 0.26.3** to protect Copycats in claimed chunks.
 
