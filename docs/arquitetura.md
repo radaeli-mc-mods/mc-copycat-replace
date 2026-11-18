@@ -16,7 +16,7 @@ O Create Forge completo foi copiado de `hotbar-locker/build/reference/create/cre
 
 O runtime utiliza os JARs embarcados pelo Create: Ponder 1.0.91, Flywheel 1.0.5, Registrate MC1.20-1.3.3 e MixinExtras 0.4.1. APIs adicionais necessárias ao compilador Forge são `compileOnly`; não são reempacotadas no addon. As dependências Forge passam por `fg.deobf`. As runs de desenvolvimento também remapeiam os refmaps de dependências.
 
-Copycats+ Forge 3.0.4 foi obtido da versão Modrinth `OjWz9bJQ`; o SHA-512 foi conferido com os metadados do download. A auditoria com `javap` confirmou as interfaces de materiais simples e multipartes, seleção por interação, armazenamento e setters usados pelo adaptador. A ausência de Copycats+ é verificada antes de chamar a classe de integração.
+O adaptador opcional de Copycats+ é compilado contra Fabric e Forge 3.0.10 no Minecraft 1.20.1 e NeoForge 3.0.11 no Minecraft 1.21.1. Os requisitos de runtime mantêm Fabric 3.0.5 e Forge/NeoForge 3.0.4 como mínimos; as versões mais novas foram compiladas com sucesso sem exigir mudança de integração. O changelog de 3.0.11 lista correções de crashes e do armazenamento de materiais. A ausência de Copycats+ é verificada antes de chamar a classe de integração.
 
 ## Fluxo das ações
 

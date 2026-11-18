@@ -114,7 +114,7 @@ for role in ('Actor', 'Observer'):
                 root / 'libs/forge1201/create-1.20.1-6.0.8.jar']:
         shutil.copy2(jar, mods / jar.name)
     if not without:
-        jar = root / 'libs/forge1201/copycats-3.0.4+mc.1.20.1-forge.jar'
+        jar = root / 'libs/forge1201/copycats-3.0.10+mc.1.20.1-forge.jar'
         shutil.copy2(jar, mods / jar.name)
     player = 'Copycat' + role
     offline = uuid.UUID(bytes=hashlib.md5(('OfflinePlayer:' + player).encode()).digest(), version=3)
